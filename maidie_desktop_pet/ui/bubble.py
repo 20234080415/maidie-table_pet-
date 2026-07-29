@@ -1,5 +1,7 @@
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QTextCursor
+from PyQt6.QtGui import (
+    QColor, QLinearGradient, QPainter, QPainterPath, QPen, QTextCursor,
+)
 from PyQt6.QtWidgets import QTextBrowser, QWidget
 
 
@@ -34,9 +36,9 @@ class SpeechBubble(QWidget):
         self._hide_timer.timeout.connect(self.hide)
         self._apply_tail_margins()
         self._text_view.setStyleSheet("""
-            QTextBrowser { background: transparent; color: #4a2938; border: none;
+            QTextBrowser { background: transparent; color: #17233b; border: none;
               font-size: 14px;
-              font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'SimSun'; }
+              font-family: 'Segoe UI Variable Text', 'Microsoft YaHei UI', 'Segoe UI'; }
         """)
         self._text_view.viewport().setStyleSheet("background: transparent;")
         self._scroll_animation = QPropertyAnimation(
@@ -82,11 +84,11 @@ class SpeechBubble(QWidget):
             rect.adjust(0, 0, -tail, 0)
 
         shadow = QPainterPath()
-        shadow.addRoundedRect(rect.translated(0, 2), 15, 15)
-        painter.fillPath(shadow, QColor(76, 35, 55, 28))
+        shadow.addRoundedRect(rect.translated(0, 4), 18, 18)
+        painter.fillPath(shadow, QColor(39, 66, 103, 45))
 
         path = QPainterPath()
-        path.addRoundedRect(rect, 15, 15)
+        path.addRoundedRect(rect, 18, 18)
         cx, cy = rect.center().x(), rect.center().y()
         if self._tail_side == "bottom":
             path.moveTo(cx - 7, rect.bottom() - 1)
@@ -105,9 +107,17 @@ class SpeechBubble(QWidget):
             path.lineTo(rect.right() + tail, cy)
             path.lineTo(rect.right() - 1, cy + 7)
         path.closeSubpath()
-        painter.fillPath(path, QColor(255, 248, 250, 244))
-        painter.setPen(QPen(QColor(213, 137, 169, 205), 1.35))
+        glass = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        glass.setColorAt(0.0, QColor(255, 255, 255, 242))
+        glass.setColorAt(0.52, QColor(239, 247, 255, 232))
+        glass.setColorAt(1.0, QColor(210, 229, 252, 222))
+        painter.fillPath(path, glass)
+        painter.setPen(QPen(QColor(112, 154, 207, 142), 1.15))
         painter.drawPath(path)
+        highlight = QPainterPath()
+        highlight.addRoundedRect(rect.adjusted(1.5, 1.5, -1.5, -1.5), 16.5, 16.5)
+        painter.setPen(QPen(QColor(255, 255, 255, 165), 0.8))
+        painter.drawPath(highlight)
         painter.end()
         super().paintEvent(event)
 

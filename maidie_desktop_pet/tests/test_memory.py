@@ -129,6 +129,30 @@ class MemorySystemTests(unittest.TestCase):
         self.assertFalse(stored)
         self.assertEqual(self.memory.load_memories(), [])
 
+    def test_assistant_inferred_nickname_is_not_saved(self):
+        self.assertTrue(self.memory.save_extracted({
+            "facts": [{"key": "user_name", "value": "小唐哥"}],
+            "preferences": [{"key": "称呼偏好", "value": "小唐哥"}],
+        }, source_message="你好"))
+
+        self.assertEqual(self.memory.load_memories(), [])
+
+    def test_explicit_user_nickname_can_be_saved(self):
+        self.assertTrue(self.memory.save_extracted({
+            "facts": [{"key": "user_name", "value": "小唐哥"}],
+            "preferences": [],
+        }, source_message="以后叫我小唐哥"))
+
+        self.assertEqual(self.memory.load_memories()[0]["value"], "小唐哥")
+
+    def test_assistant_inferred_roleplay_preference_is_not_saved(self):
+        self.assertTrue(self.memory.save_extracted({
+            "facts": [],
+            "preferences": [{"key": "角色扮演风格", "value": "可爱女仆"}],
+        }, source_message="用户点了点你"))
+
+        self.assertEqual(self.memory.load_memories(), [])
+
     def test_delete_failure_is_reported(self):
         self._seed_all_memory_types()
         with patch.object(

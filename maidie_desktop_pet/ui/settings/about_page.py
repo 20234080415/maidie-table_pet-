@@ -18,7 +18,7 @@ class AboutPage(QWidget):
         title = QLabel(APP_NAME)
         title.setObjectName("aboutAppName")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 22px; font-weight: 700; color: #704653;")
+        title.setStyleSheet("font-size: 22px; font-weight: 700; color: #17233b;")
         version = QLabel(f"当前版本：{APP_VERSION}")
         version.setObjectName("aboutVersion")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -28,7 +28,7 @@ class AboutPage(QWidget):
         description.setWordWrap(True)
         details = QLabel(
             f"作者：{APP_AUTHOR}<br>技术栈：{APP_TECH_STACK}<br><br>"
-            "Maidie 是一个行为驱动的 AI 桌面女仆，也是一个正在成长中的桌面 Agent。<br><br>"
+            "Maidie 是一个行为驱动的 AI 桌面伙伴，也是一个正在成长中的桌面 Agent。<br><br>"
             "<b>当前能力</b><br>桌宠动画 · 点击 / 拖拽 / 缩放 · 围栏与回弹<br>"
             "聊天气泡 · LLM 对话 · 工具调用 · 记忆系统<br>"
             "搜索工具 · OCR / Window 感知开发中"

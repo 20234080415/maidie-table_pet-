@@ -5,7 +5,10 @@ from time import monotonic
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QGuiApplication
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout
+from PyQt6.QtWidgets import (
+    QDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout,
+)
+from ui.theme import apply_dialog_theme
 
 
 class CodingAgentConsole(QDialog):
@@ -22,12 +25,16 @@ class CodingAgentConsole(QDialog):
         self.setWindowTitle("OpenCode Console / Coding Agent Console")
         self.resize(620, 360)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.Tool)
-        self.setStyleSheet("QDialog{background:#171b22;color:#b8f7c7} QTextEdit{background:#0b0e12;color:#9ef0b1;font-family:Consolas;border:1px solid #3c7650} QPushButton{padding:5px 10px}")
+        apply_dialog_theme(self, dark=True)
         self.status = QLabel("状态：待机")
+        self.status.setObjectName("statusChip")
         self.elapsed = QLabel("已运行：0 秒")
         self.last_output = QLabel("最近输出：—")
         top = QHBoxLayout(); top.addWidget(self.status); top.addStretch(); top.addWidget(self.elapsed); top.addWidget(self.last_output)
-        self.output = QTextEdit(); self.output.setReadOnly(True)
+        self.output = QPlainTextEdit()
+        self.output.setObjectName("codingAgentOutput")
+        self.output.setReadOnly(True)
+        self.output.setMaximumBlockCount(200)
         cancel = QPushButton("取消"); cancel.clicked.connect(cancel_callback)
         clear = QPushButton("清空"); clear.clicked.connect(self.clear)
         copy = QPushButton("复制日志"); copy.clicked.connect(self.copy_log)
@@ -45,7 +52,7 @@ class CodingAgentConsole(QDialog):
             full = f"[{event.get('stream', 'stdout')}] {event.get('line', '')}"
             self.lines.append(full)
             shown = full if len(full) <= 500 else full[:500] + " …[截断]"
-            self.output.append(shown)
+            self.output.appendPlainText(shown)
         elif kind in {"status", "finish"}:
             self._set_status(str(event.get("status") or "failed"))
             if kind == "finish": self.timer.stop()

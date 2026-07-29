@@ -9,6 +9,7 @@ from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QPushButton, QTextBrowser, QVBoxLayout,
 )
+from ui.theme import apply_dialog_theme
 
 
 class LongResponsePanel(QDialog):
@@ -38,19 +39,21 @@ class LongResponsePanel(QDialog):
         self.setMaximumWidth(560)
         self.resize(520, 420)
         self.setMaximumHeight(500)
-        self.setStyleSheet(
-            "QDialog{background:#f5e9ec;color:#49343d;}"
-            "QLabel#panelTitle{font-size:17px;font-weight:600;padding:5px;}"
-            "QTextBrowser{background:#fffafb;color:#3f3036;border:1px solid #d4adb8;"
-            "border-radius:10px;padding:12px;font-size:14px;}"
-            "QPushButton{background:#d9a8b6;color:#3f2d34;border:1px solid #c38b9c;"
-            "border-radius:8px;padding:6px 14px;}"
-        )
+        apply_dialog_theme(self)
 
         self.title_label = QLabel("详细结果")
         self.title_label.setObjectName("panelTitle")
         self.browser = QTextBrowser()
+        self.browser.setObjectName("resultBrowser")
         self.browser.setOpenExternalLinks(True)
+        self.browser.document().setDocumentMargin(7.0)
+        self.browser.document().setDefaultStyleSheet(
+            "p { margin: 4px 0 10px 0; }"
+            "h3 { margin: 14px 0 6px 0; color: #1d4f8c; }"
+            "ol, ul { margin: 5px 0 8px 20px; }"
+            "a { color: #0879d9; text-decoration: none; }"
+            "hr { color: #c7d7ea; }"
+        )
         self.copy_button = QPushButton("复制")
         self.copy_button.clicked.connect(self.copy_full_content)
         self.close_button = QPushButton("关闭")

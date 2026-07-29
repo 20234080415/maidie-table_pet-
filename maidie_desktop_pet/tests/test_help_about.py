@@ -28,6 +28,18 @@ class _Controller:
         pass
 
 
+class _StartupController(_Controller):
+    def __init__(self):
+        self.applied = None
+
+    def settings_snapshot(self):
+        return {"startup_supported": True, "launch_on_startup": True}
+
+    def apply_settings(self, values):
+        self.applied = values
+        return {"settings": values, "autostart_error": ""}
+
+
 class VersionInformationTests(unittest.TestCase):
     def test_application_identity_is_available(self):
         self.assertEqual(APP_NAME, "Maidie Desktop Pet")
@@ -81,7 +93,21 @@ class HelpAndAboutPageTests(unittest.TestCase):
         flags = dialog.windowFlags()
         self.assertFalse(flags & Qt.WindowType.WindowStaysOnTopHint)
         self.assertTrue(flags & Qt.WindowType.WindowMinimizeButtonHint)
+        self.assertTrue(flags & Qt.WindowType.WindowMaximizeButtonHint)
+        self.assertTrue(dialog.isSizeGripEnabled())
         dialog.close()
+
+    def test_startup_option_is_visible_and_saved(self):
+        controller = _StartupController()
+        dialog = SettingsDialog(controller)
+        self.assertTrue(dialog.launch_on_startup.isEnabled())
+        self.assertTrue(dialog.launch_on_startup.isChecked())
+
+        dialog.launch_on_startup.setChecked(False)
+        dialog._save()
+
+        self.assertIsNotNone(controller.applied)
+        self.assertFalse(controller.applied["launch_on_startup"])
 
     def test_coding_agent_settings_are_read_only_and_testable(self):
         dialog = SettingsDialog(_Controller())
@@ -138,6 +164,10 @@ class HelpAndAboutPageTests(unittest.TestCase):
         cancel.assert_called_once_with()
         console.handle_event({"event": "finish", "status": "cancelled"})
         self.assertIn("已取消", console.status.text())
+        console.handle_event({
+            "event": "output", "stream": "stderr", "line": "<literal-output>",
+        })
+        self.assertIn("<literal-output>", console.output.toPlainText())
         console.close()
 
 

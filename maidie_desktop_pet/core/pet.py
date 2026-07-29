@@ -60,6 +60,7 @@ class PetController(QObject):
         action_registry: Any | None = None,
         proactive_runtime: Any | None = None,
         proactive_tick_seconds: int = 45,
+        autostart_manager: Any | None = None,
     ) -> None:
         super().__init__()
         self.ai_router = ai_router
@@ -69,6 +70,7 @@ class PetController(QObject):
         self.config_store = config_store
         self.action_registry = action_registry
         self.proactive_runtime = proactive_runtime
+        self.autostart_manager = autostart_manager
         self.state_machine = StateMachine()
         self.movement = MovementController(**(movement_options or {}))
         self.direction = DirectionManager()
@@ -268,12 +270,41 @@ class PetController(QObject):
         return self.memory.get_recent()
 
     def settings_snapshot(self) -> dict[str, Any]:
-        return self.config_store.public_settings() if self.config_store else {}
+        public = self.config_store.public_settings() if self.config_store else {}
+        public["startup_supported"] = bool(
+            self.autostart_manager and self.autostart_manager.supported
+        )
+        if self.autostart_manager and self.autostart_manager.supported:
+            try:
+                public["launch_on_startup"] = self.autostart_manager.is_enabled()
+            except Exception:
+                self.logger.exception("Unable to read Windows autostart state")
+        return public
 
-    def apply_settings(self, values: dict[str, Any]) -> None:
+    def apply_settings(self, values: dict[str, Any]) -> dict[str, Any]:
         if not self.config_store:
-            return
-        config = self.config_store.update_user_settings(values)
+            return {"settings": {}, "autostart_error": ""}
+        applied_values = dict(values)
+        autostart_error = ""
+        if self.autostart_manager and self.autostart_manager.supported:
+            try:
+                applied_values["launch_on_startup"] = (
+                    self.autostart_manager.set_enabled(
+                        bool(values.get("launch_on_startup", False))
+                    )
+                )
+            except Exception as exc:
+                autostart_error = str(exc)
+                self.logger.exception("Unable to apply Windows autostart setting")
+                try:
+                    applied_values["launch_on_startup"] = (
+                        self.autostart_manager.is_enabled()
+                    )
+                except Exception:
+                    applied_values["launch_on_startup"] = False
+        else:
+            applied_values["launch_on_startup"] = False
+        config = self.config_store.update_user_settings(applied_values)
         ai = config.get("ai", {})
         technical = config.get("codex", {})
         environment_key = (
@@ -325,8 +356,15 @@ class PetController(QObject):
         if system_tool is not None and hasattr(system_tool, "configure"):
             system_tool.configure(config.get("workspace", {}))
         public = self.config_store.public_settings()
+        public["startup_supported"] = bool(
+            self.autostart_manager and self.autostart_manager.supported
+        )
+        public["launch_on_startup"] = bool(
+            applied_values.get("launch_on_startup", False)
+        )
         self.settings_changed.emit(public)
         self._broadcast("on_settings_changed", public)
+        return {"settings": public, "autostart_error": autostart_error}
 
     def _broadcast(self, event: str, payload: Any = None) -> None:
         for callback in tuple(self._listeners[event]):
@@ -519,7 +557,7 @@ class PetController(QObject):
         if self._busy:
             QTimer.singleShot(540, self._restore_after_interaction)
         else:
-            QTimer.singleShot(540, lambda: self.submit_text("主人点了点你，请自然地回应。"))
+            QTimer.singleShot(540, lambda: self.submit_text("用户点了点你，请按当前人格自然地回应。"))
 
     def on_headpat(self) -> None:
         """Play a local head-pat reaction without spending an API request."""
@@ -753,7 +791,14 @@ class PetController(QObject):
         text = message.strip()
         if is_simple_time_query(text) or is_weather_query(text):
             return False
-        if re.fullmatch(r"(?:你好|嗨|hello|hi|嗯|好的)[！!。.？?\s]*", text, re.I):
+        if re.fullmatch(
+            r"(?:你好|您好|哈喽|嗨|hello|hi|hey|在吗|早上好|下午好|晚上好|嗯|好的)"
+            r"[，。！？,.!?\s～~]*",
+            text,
+            re.IGNORECASE,
+        ):
+            return False
+        if re.match(r"^(?:用户|主人)点了点你", text):
             return False
         if response.get("source") in {"tool", "screen"}:
             return False
@@ -766,9 +811,11 @@ class PetController(QObject):
         try:
             extracted = self.ai_router.extract_memories(message, response)
             if generation is None:
-                self.memory.save_extracted(extracted)
+                self.memory.save_extracted(extracted, source_message=message)
             else:
-                self.memory.save_extracted(extracted, generation=generation)
+                self.memory.save_extracted(
+                    extracted, generation=generation, source_message=message
+                )
         except Exception:
             self.logger.exception("Memory extraction failed")
         finally:

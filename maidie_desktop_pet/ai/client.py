@@ -151,7 +151,7 @@ class OpenAICompatibleClient(AIClient):
                     "emotion": "thinking", "action": "thinking", "state": "thinking",
                 }, "codex")
             return normalize_response({
-                "text": "主人终于想起我啦？哼，我才没有一直在等呢。",
+                "text": "嗯，我在。想聊点什么，或者有事要我一起处理？",
                 "emotion": "excited", "action": "talk", "state": "talking",
             }, "chat")
 

@@ -13,8 +13,11 @@
     "timeout": 90
   },
   "personality": {
-    "preset": "gentle_tsundere",
+    "preset": "wjk_idol",
     "custom_prompt": ""
+  },
+  "startup": {
+    "launch_on_login": false
   },
   "movement": {
     "walk_speed": 70,

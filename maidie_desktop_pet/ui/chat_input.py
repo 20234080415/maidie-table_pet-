@@ -2,6 +2,8 @@ from PyQt6.QtCore import QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import QLineEdit
 
+from ui.theme import CHAT_INPUT_STYLE
+
 
 class ChatInput(QLineEdit):
     submitted = pyqtSignal(str)
@@ -16,10 +18,7 @@ class ChatInput(QLineEdit):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setPlaceholderText("和 Maidie 说点什么…")
-        self.setStyleSheet("""
-            QLineEdit { background: rgba(255, 250, 252, 242); color: #44283a;
-              border: 2px solid #df8fb1; border-radius: 12px; padding: 7px 10px; }
-        """)
+        self.setStyleSheet(CHAT_INPUT_STYLE)
         self.returnPressed.connect(self._submit)
         self._dismiss_timer = QTimer(self)
         self._dismiss_timer.setSingleShot(True)

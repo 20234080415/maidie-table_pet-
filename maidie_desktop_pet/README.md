@@ -38,7 +38,7 @@ python main.py
 | 分组 | 用途 |
 |---|---|
 | `ai` / `codex` | 聊天与技术模型、Base URL、模型名、超时 |
-| `personality` | 人格预设与自定义描述 |
+| `personality` / `startup` | 人格预设、自定义描述与当前用户开机自启动 |
 | `movement` / `window` / `fence` | 移动、窗口与围栏行为 |
 | `network` | Tavily 搜索开关、超时和来源展示 |
 | `vision` | 本地 OCR 与 Qwen VL 参数 |

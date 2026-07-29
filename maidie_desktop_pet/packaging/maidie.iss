@@ -42,5 +42,8 @@ Name: "{autodesktop}\Maidie"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 Maidie"; Flags: nowait postinstall skipifsilent
 
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Maidie"; Flags: uninsdeletevalue
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\logs"

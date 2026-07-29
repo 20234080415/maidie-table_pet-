@@ -12,7 +12,11 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from core.prompts.personality import PERSONALITY_PRESETS, build_personality_prompt
+from core.prompts.personality import (
+    DEFAULT_PERSONALITY_PRESET,
+    PERSONALITY_PRESETS,
+    build_personality_prompt,
+)
 
 NETWORK_DEFAULTS = {
     "enabled": False,
@@ -66,6 +70,7 @@ ANIMATION_DEFAULTS = {
     "live2d_pet_align": "bottom",
     "live2d_fit_padding": 0.80,
 }
+STARTUP_DEFAULTS = {"launch_on_login": False}
 
 
 class ConfigStore:
@@ -130,6 +135,9 @@ class ConfigStore:
             animation["live2d_fit_padding"] = self._bounded_float(
                 animation.get("live2d_fit_padding"), 0.80, 0.5, 0.90
             )
+            startup = config.setdefault("startup", {})
+            for key, value in STARTUP_DEFAULTS.items():
+                startup.setdefault(key, value)
             return config
 
     def public_settings(self) -> dict[str, Any]:
@@ -143,13 +151,14 @@ class ConfigStore:
         workspace = config.get("workspace", {})
         coding_agent = config.get("coding_agent", {})
         animation = config.get("animation", {})
+        startup = config.get("startup", {})
         key = str(ai.get("api_key", ""))
         return {
             "provider": ai.get("provider", "deepseek"),
             "base_url": ai.get("base_url", "https://api.deepseek.com"),
             "chat_model": ai.get("model", "deepseek-v4-flash"),
             "technical_model": technical.get("model", "deepseek-v4-pro"),
-            "personality_preset": personality.get("preset", "gentle_tsundere"),
+            "personality_preset": personality.get("preset", DEFAULT_PERSONALITY_PRESET),
             "custom_personality": personality.get("custom_prompt", ""),
             "has_api_key": bool(key and key != "YOUR_API_KEY_HERE"),
             "network_enabled": bool(network.get("enabled", False)),
@@ -190,6 +199,7 @@ class ConfigStore:
             "animation_live2d_pet_offset_y": float(animation.get("live2d_pet_offset_y", 0.0)),
             "animation_live2d_pet_align": str(animation.get("live2d_pet_align", "bottom")),
             "animation_live2d_fit_padding": float(animation.get("live2d_fit_padding", 0.80)),
+            "launch_on_startup": bool(startup.get("launch_on_login", False)),
         }
 
     def update_user_settings(self, values: dict[str, Any]) -> dict[str, Any]:
@@ -204,12 +214,15 @@ class ConfigStore:
             workspace = config.setdefault("workspace", {})
             coding_agent = config.setdefault("coding_agent", {})
             animation = config.setdefault("animation", {})
+            startup = config.setdefault("startup", {})
             ai["provider"] = str(values.get("provider", ai.get("provider", "deepseek")))
             ai["base_url"] = str(values.get("base_url", ai.get("base_url", ""))).rstrip("/")
             ai["model"] = str(values.get("chat_model", ai.get("model", "")))
             technical["base_url"] = ai["base_url"]
             technical["model"] = str(values.get("technical_model", technical.get("model", "")))
-            personality["preset"] = str(values.get("personality_preset", "gentle_tsundere"))
+            personality["preset"] = str(
+                values.get("personality_preset", DEFAULT_PERSONALITY_PRESET)
+            )
             personality["custom_prompt"] = str(values.get("custom_personality", "")).strip()
             new_key = str(values.get("api_key", "")).strip()
             if new_key:
@@ -293,13 +306,18 @@ class ConfigStore:
                 values.get("animation_live2d_fit_padding", animation.get("live2d_fit_padding")),
                 0.80, 0.5, 0.90,
             )
+            startup["launch_on_login"] = bool(
+                values.get(
+                    "launch_on_startup", startup.get("launch_on_login", False)
+                )
+            )
             self._atomic_write(config)
             return deepcopy(config)
 
     def personality_prompt(self, config: dict[str, Any] | None = None) -> str:
         config = config or self.load()
         settings = config.get("personality", {})
-        preset = str(settings.get("preset", "gentle_tsundere"))
+        preset = str(settings.get("preset", DEFAULT_PERSONALITY_PRESET))
         custom = str(settings.get("custom_prompt", "")).strip()
         return build_personality_prompt(preset, custom)
 

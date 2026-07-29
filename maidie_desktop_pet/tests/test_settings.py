@@ -5,7 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.prompts.personality import PERSONALITY_PRESETS, build_personality_prompt
+from core.personality.maidie_style import MaidieStyle
+from core.prompts.personality import (
+    DEFAULT_PERSONALITY_PRESET,
+    PERSONALITY_PRESETS,
+    build_personality_prompt,
+)
 from core.settings import ConfigStore
 
 
@@ -19,11 +24,23 @@ class PersonalityPromptTests(unittest.TestCase):
         custom = "你是一位说话简洁、喜欢用比喻的桌面伙伴。"
         self.assertEqual(build_personality_prompt("custom", custom), custom)
 
-    def test_unknown_preset_falls_back_to_gentle_tsundere(self):
+    def test_default_personality_is_wjk_idol(self):
+        self.assertEqual(DEFAULT_PERSONALITY_PRESET, "wjk_idol")
+        prompt = build_personality_prompt(DEFAULT_PERSONALITY_PRESET)
+        self.assertIn("WJK 爱豆", prompt)
+        self.assertIn("青年男生桌面伙伴", prompt)
+        self.assertIn("不是女仆", prompt)
+        self.assertIn("任何姓名、昵称", prompt)
+        self.assertIn("看守、整理桌面", prompt)
+
+    def test_unknown_preset_falls_back_to_default(self):
         self.assertEqual(
             build_personality_prompt("missing-preset"),
-            build_personality_prompt("gentle_tsundere"),
+            build_personality_prompt(DEFAULT_PERSONALITY_PRESET),
         )
+
+    def test_style_guard_does_not_force_old_tsundere_catchphrase(self):
+        self.assertEqual(MaidieStyle().preserve("任务已经完成。"), "任务已经完成。")
 
 
 class ConfigStoreTests(unittest.TestCase):
@@ -63,11 +80,24 @@ class ConfigStoreTests(unittest.TestCase):
         legacy = {"personality": {"preset": "custom", "custom_prompt": "保持冷静简洁。"}}
         self.assertEqual(self.store.personality_prompt(legacy), "保持冷静简洁。")
 
+    def test_missing_personality_uses_wjk_idol_default(self):
+        prompt = self.store.personality_prompt({"personality": {}})
+        self.assertIn("WJK 爱豆", prompt)
+
     def test_missing_network_settings_use_safe_defaults(self):
         saved = self.store.load()
         self.assertFalse(saved["network"]["enabled"])
         self.assertEqual(saved["network"]["timeout"], 10)
         self.assertNotIn("network_search_api_key", self.store.public_settings())
+
+    def test_startup_setting_defaults_off_and_can_be_saved(self):
+        self.assertFalse(self.store.load()["startup"]["launch_on_login"])
+        self.assertFalse(self.store.public_settings()["launch_on_startup"])
+
+        self.store.update_user_settings({"launch_on_startup": True})
+
+        self.assertTrue(self.store.load()["startup"]["launch_on_login"])
+        self.assertTrue(self.store.public_settings()["launch_on_startup"])
 
     def test_proactive_behavior_is_disabled_by_default(self):
         saved = self.store.load()

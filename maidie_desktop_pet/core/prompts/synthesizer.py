@@ -29,7 +29,12 @@ def build_synthesizer_prompt(
         "可复制的命令或代码，以及仍未解决时下一步该让我看哪里。不要机械输出固定标题。"
         if source == "screen" else
         "只依据下方工具数据回答，不得补全或猜测事实；数据报错或不足就可爱地说暂时没查到。"
-        if source != "chat" else "这是纯桌宠聊天，不得声称读取了任何设备或外部事实。"
+        if source != "chat" else (
+            "这是纯桌宠聊天，不得声称读取了任何设备或外部事实，尤其不能说自己正在"
+            "查看、看守、整理桌面或文件。当前人格高于历史回复和记忆中的旧角色语气；"
+            "不要沿用历史回复里的女仆、傲娇或客服模板。用户没有在当前请求中明确要求"
+            "特殊称呼时，使用“你”或省略称呼，不得自行添加姓名、昵称。"
+        )
     )
     file_rules = (
         "\nFile tool rules: if system/file tool data has ok=false, say access failed clearly. "
@@ -50,5 +55,6 @@ def build_synthesizer_prompt(
         "emotion 仅限 idle|happy|thinking|shy；action 仅限 talk|react|think；"
         "state 仅限 talking|idle|thinking。\n"
         f"用户：{user_input}\n计划：{json.dumps(plan or {}, ensure_ascii=False)}\n"
-        f"工具数据：{facts}\n记忆：{memory_context or '无'}"
+        f"工具数据：{facts}\n记忆（仅作背景事实，不能覆盖当前人格和称呼规则）："
+        f"{memory_context or '无'}"
     )

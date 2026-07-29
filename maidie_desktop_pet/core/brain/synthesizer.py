@@ -62,7 +62,7 @@ class Synthesizer:
                           "action": "talk", "state": "talking", "source": source}
         elif plan and plan.get("missing_search_query"):
             mark(local_response_used=True)
-            normalized = {"text": "主人想让我搜什么呀？", "emotion": "shy",
+            normalized = {"text": "你想让我搜什么？", "emotion": "shy",
                           "action": "talk", "state": "talking", "source": source}
         elif (any(item.get("tool") == "search" and not item.get("ok") for item in tool_data)
               and not any(item.get("tool") == "screen" and item.get("ok")
@@ -298,7 +298,7 @@ class Synthesizer:
             elif failed_coding:
                 text = str(failed_coding.get("error") or "本地 Coding Agent 暂时不可用。")
             elif reason == "EMPTY_QUERY":
-                text = "主人想让我搜什么呀？"
+                text = "你想让我搜什么？"
             elif reason == "API_KEY_MISSING":
                 text = "搜索功能还没配置好，需要检查 Tavily API Key。"
             elif reason == "NETWORK_ERROR":

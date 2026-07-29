@@ -129,6 +129,11 @@ class FastResponseTests(unittest.TestCase):
     def test_memory_skip_rules(self):
         self.assertFalse(PetController._should_extract_memory("现在几点", {"source": "tool"}))
         self.assertFalse(PetController._should_extract_memory("今天天气怎么样", {"source": "tool"}))
+        self.assertFalse(PetController._should_extract_memory("hello", {"source": "chat"}))
+        self.assertFalse(PetController._should_extract_memory("下午好～", {"source": "chat"}))
+        self.assertFalse(PetController._should_extract_memory(
+            "用户点了点你，请按当前人格自然地回应。", {"source": "chat"}
+        ))
         self.assertTrue(PetController._should_extract_memory("我喜欢简洁的回答", {"source": "chat"}))
 
     def test_background_executors_are_separate(self):

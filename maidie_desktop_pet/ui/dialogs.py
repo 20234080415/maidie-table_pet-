@@ -15,7 +15,10 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
     QPushButton,
+    QPlainTextEdit,
+    QScrollArea,
     QSpinBox,
+    QSizePolicy,
     QTabWidget,
     QTextBrowser,
     QTextEdit,
@@ -31,57 +34,7 @@ from ui.live2d_pet_window import create_live2d_pet_window
 from ui.live2d_preview_dialog import create_live2d_preview_dialog
 from core.tools.coding_agent_tool import CodingAgentTool
 from core.tools.coding_agent_installer import CodingAgentInstaller
-
-
-BASE_STYLE = """
-QDialog, QWidget {
-  background: #f1e4e7;
-  color: #49343d;
-}
-QLabel, QCheckBox { color: #574049; }
-QLineEdit, QTextEdit, QComboBox, QTextBrowser, QSpinBox {
-  background: #f8eef0;
-  color: #3f3036;
-  border: 1px solid #cfaab4;
-  border-radius: 8px;
-  padding: 6px;
-  selection-background-color: #c98fa1;
-  selection-color: #2e2025;
-}
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
-  background: #faF2f3;
-  border: 1px solid #b9798d;
-}
-QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
-  background: #e6d8dc;
-  color: #89747b;
-}
-QPushButton {
-  background: #d9a8b6;
-  color: #3f2d34;
-  border: 1px solid #c38b9c;
-  border-radius: 8px;
-  padding: 7px 14px;
-}
-QPushButton:hover { background: #ce96a7; }
-QPushButton:pressed { background: #bf8497; }
-QTabWidget::pane {
-  background: #eadadd;
-  border: 1px solid #cda6b1;
-  border-radius: 8px;
-  top: -1px;
-}
-QTabBar::tab {
-  background: #dfc9cf;
-  color: #634852;
-  border: 1px solid #cba7b1;
-  padding: 7px 12px;
-  margin-right: 2px;
-  border-top-left-radius: 7px;
-  border-top-right-radius: 7px;
-}
-QTabBar::tab:selected { background: #eadadd; color: #3f2d34; }
-"""
+from ui.theme import BASE_STYLE, apply_dialog_theme
 
 
 class _OpenCodeInstallWorker(QObject):
@@ -120,8 +73,9 @@ class RecentChatsDialog(QDialog):
         self.controller = controller
         self.setWindowTitle("Maidie 的最近聊天")
         self.resize(460, 430)
-        self.setStyleSheet(BASE_STYLE)
+        apply_dialog_theme(self)
         self.browser = QTextBrowser()
+        self.browser.setObjectName("recentChatsBrowser")
         clear_button = QPushButton("清除聊天记录")
         clear_button.clicked.connect(self._clear)
         layout = QVBoxLayout(self)
@@ -132,7 +86,7 @@ class RecentChatsDialog(QDialog):
     def refresh(self) -> None:
         items = self.controller.recent_chats()
         if not items:
-            self.browser.setHtml("<p style='color:#9b7284;text-align:center'>还没有聊天记录。</p>")
+            self.browser.setHtml("<p style='color:#77849a;text-align:center'>还没有聊天记录。</p>")
             return
         parts = []
         for item in items:
@@ -141,9 +95,9 @@ class RecentChatsDialog(QDialog):
             response = html.escape(str(item.get("response", "")))
             parts.append(
                 f"<div style='margin:8px 2px 14px'>"
-                f"<small style='color:#a0798a'>{when}</small>"
+                f"<small style='color:#718096'>{when}</small>"
                 f"<p><b>你：</b>{message}</p>"
-                f"<p style='background:#fff0f5;padding:8px;border-radius:9px'>"
+                f"<p style='background:#eef6ff;padding:8px;border-radius:9px'>"
                 f"<b>Maidie：</b>{response}</p></div>"
             )
         self.browser.setHtml("".join(parts))
@@ -228,20 +182,33 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Maidie 设置")
         flags = self.windowFlags()
         flags &= ~Qt.WindowType.WindowStaysOnTopHint
-        flags |= Qt.WindowType.WindowMinimizeButtonHint
+        flags |= (
+            Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+        )
         self.setWindowFlags(flags)
-        self.resize(720, 540)
-        self.setStyleSheet(BASE_STYLE)
+        self.resize(900, 580)
+        self.setMinimumSize(680, 460)
+        self.setSizeGripEnabled(True)
+        apply_dialog_theme(self)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_personality_tab(), "性格")
-        self.tabs.addTab(self._build_model_tab(), "模型与 API")
-        self.tabs.addTab(self._build_animation_tab(), "动画 / Live2D")
-        self.tabs.addTab(self._build_network_tab(), "联网查询")
-        self.tabs.addTab(self._build_vision_tab(), "千问视觉")
-        self.tabs.addTab(self._build_coding_agent_tab(), "工作区 / Coding Agent")
-        self.tabs.addTab(self._build_proactive_tab(), "主动行为")
-        self.tabs.addTab(MemorySettingsPage(controller, self), "数据与记忆")
+        self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.addTab(self._scrollable(self._build_personality_tab()), "常规与性格")
+        self.tabs.addTab(self._scrollable(self._build_model_tab()), "模型与 API")
+        self.tabs.addTab(self._scrollable(self._build_animation_tab()), "动画 / Live2D")
+        self.tabs.addTab(self._scrollable(self._build_network_tab()), "联网查询")
+        self.tabs.addTab(self._scrollable(self._build_vision_tab()), "千问视觉")
+        self.tabs.addTab(
+            self._scrollable(self._build_coding_agent_tab()),
+            "工作区 / Coding Agent",
+        )
+        self.tabs.addTab(self._scrollable(self._build_proactive_tab()), "主动行为")
+        self.tabs.addTab(
+            self._scrollable(MemorySettingsPage(controller, self)),
+            "数据与记忆",
+        )
         if initial_tab:
             for index in range(self.tabs.count()):
                 if self.tabs.tabText(index) == initial_tab:
@@ -258,9 +225,65 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.tabs)
         layout.addWidget(buttons)
 
+    @staticmethod
+    def _scrollable(page: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(page)
+        return scroll
+
     def _build_personality_tab(self) -> QWidget:
         page = QWidget()
-        layout = QFormLayout(page)
+        outer_layout = QVBoxLayout(page)
+        outer_layout.setContentsMargins(14, 14, 14, 14)
+        outer_layout.setSpacing(12)
+
+        startup_card = QWidget()
+        startup_card.setObjectName("settingsCard")
+        startup_layout = QVBoxLayout(startup_card)
+        startup_layout.setContentsMargins(18, 16, 18, 16)
+        startup_layout.setSpacing(7)
+        startup_title = QLabel("启动与系统")
+        startup_title.setObjectName("sectionTitle")
+        startup_note = QLabel("使用当前 Windows 账户登录后自动启动 Maidie，无需管理员权限。")
+        startup_note.setObjectName("sectionSubtitle")
+        startup_note.setWordWrap(True)
+        self.launch_on_startup = QCheckBox("登录 Windows 后自动启动")
+        self.launch_on_startup.setObjectName("launchOnStartup")
+        self.launch_on_startup.setChecked(
+            bool(self.settings.get("launch_on_startup", False))
+        )
+        startup_supported = bool(self.settings.get("startup_supported", False))
+        self.launch_on_startup.setEnabled(startup_supported)
+        startup_status = QLabel(
+            "关闭后会移除当前用户的启动项。"
+            if startup_supported
+            else "当前环境不支持 Windows 开机自启动。"
+        )
+        startup_status.setObjectName("settingHint")
+        startup_status.setWordWrap(True)
+        startup_layout.addWidget(startup_title)
+        startup_layout.addWidget(startup_note)
+        startup_layout.addSpacing(3)
+        startup_layout.addWidget(self.launch_on_startup)
+        startup_layout.addWidget(startup_status)
+
+        personality_card = QWidget()
+        personality_card.setObjectName("settingsCard")
+        card_layout = QVBoxLayout(personality_card)
+        card_layout.setContentsMargins(18, 16, 18, 16)
+        card_layout.setSpacing(10)
+        personality_title = QLabel("角色人格")
+        personality_title.setObjectName("sectionTitle")
+        personality_subtitle = QLabel("选择默认气质；只有“自定义”预设会启用下方描述。")
+        personality_subtitle.setObjectName("sectionSubtitle")
+        personality_subtitle.setWordWrap(True)
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(12)
         self.personality = QComboBox()
         for key, preset in PERSONALITY_PRESETS.items():
             self.personality.addItem(preset["name"], key)
@@ -269,13 +292,26 @@ class SettingsDialog(QDialog):
         self.personality.currentIndexChanged.connect(self._update_personality_help)
         self.personality_help = QLabel()
         self.personality_help.setWordWrap(True)
+        self.personality_help.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        self.personality_help.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+        )
+        self.personality_help.setMaximumHeight(76)
         self.custom_personality = QTextEdit()
-        self.custom_personality.setPlaceholderText("例如：更黏人一点，喜欢用轻松的短句安慰主人……")
+        self.custom_personality.setPlaceholderText("例如：沉稳一点，喜欢用轻松的短句陪伴用户……")
         self.custom_personality.setPlainText(self.settings.get("custom_personality", ""))
         self.custom_personality.setMaximumHeight(120)
         layout.addRow("性格预设", self.personality)
         layout.addRow("性格说明", self.personality_help)
         layout.addRow("自定义性格", self.custom_personality)
+        card_layout.addWidget(personality_title)
+        card_layout.addWidget(personality_subtitle)
+        card_layout.addLayout(layout)
+        outer_layout.addWidget(startup_card)
+        outer_layout.addWidget(personality_card)
+        outer_layout.addStretch()
         self._update_personality_help()
         return page
 
@@ -792,11 +828,13 @@ class SettingsDialog(QDialog):
         install_buttons_layout.addWidget(self.detect_opencode_button)
         install_buttons_layout.addWidget(self.install_opencode_button)
         install_buttons_layout.addWidget(self.redetect_opencode_button)
-        self.install_log = QTextEdit()
+        self.install_log = QPlainTextEdit()
         self.install_log.setObjectName("openCodeInstallLog")
         self.install_log.setReadOnly(True)
         self.install_log.setPlaceholderText("检测和安装结果会显示在这里。")
-        self.install_log.setMaximumHeight(120)
+        self.install_log.setMinimumHeight(124)
+        self.install_log.setMaximumHeight(156)
+        self.install_log.setMaximumBlockCount(200)
         self.opencode_setup_status = QLabel()
         self.opencode_setup_status.setWordWrap(True)
         open_config = QPushButton("打开 OpenCode 配置")
@@ -865,20 +903,20 @@ class SettingsDialog(QDialog):
         if write_log:
             if methods:
                 names = "、".join(labels[name] for name in methods)
-                self.install_log.append(f"检测到安装方式：{names}")
+                self.install_log.appendPlainText(f"检测到安装方式：{names}")
             else:
-                self.install_log.append("未检测到 npm、Scoop 或 Chocolatey。")
-                self.install_log.append("请先安装 Node.js、Scoop 或 Chocolatey 后重试。")
-                self.install_log.append("Maidie 不会自动安装这些前置环境。")
+                self.install_log.appendPlainText("未检测到 npm、Scoop 或 Chocolatey。")
+                self.install_log.appendPlainText("请先安装 Node.js、Scoop 或 Chocolatey 后重试。")
+                self.install_log.appendPlainText("Maidie 不会自动安装这些前置环境。")
         return methods
 
     def _detect_opencode(self) -> None:
         executable = self.coding_agent_installer.detect_opencode()
         if executable:
-            self.install_log.append(f"OpenCode 可用：{executable}")
+            self.install_log.appendPlainText(f"OpenCode 可用：{executable}")
             self.coding_agent_test_result.setText("可用")
         else:
-            self.install_log.append("未检测到 OpenCode。")
+            self.install_log.appendPlainText("未检测到 OpenCode。")
         self._refresh_install_methods()
         self._refresh_setup_status()
 
@@ -895,14 +933,14 @@ class SettingsDialog(QDialog):
         QMessageBox.information(self, "OpenCode 可见终端", f"终端打开后，请在 OpenCode 中执行 {instruction}。\nMaidie 不会读取或保存 API Key。")
         result = self.coding_agent_installer.open_visible_terminal(self.workspace_root.text())
         if not result.get("ok"):
-            self.install_log.append(str(result.get("error") or "无法打开 OpenCode"))
+            self.install_log.appendPlainText(str(result.get("error") or "无法打开 OpenCode"))
 
     def _run_readonly_coding_test(self) -> None:
         if not self.workspace_root.text().strip():
-            self.install_log.append("只读联调失败：workspace 未配置")
+            self.install_log.appendPlainText("只读联调失败：workspace 未配置")
             return
         if not self.coding_agent_enabled.isChecked():
-            self.install_log.append("只读联调失败：Coding Agent 未启用")
+            self.install_log.appendPlainText("只读联调失败：Coding Agent 未启用")
             return
         self.coding_agent_dry_run.setChecked(True)
         self.controller.submit_text("用 OpenCode 对当前项目执行只读 test plan，不修改文件，不执行 shell，不提交代码")
@@ -927,9 +965,9 @@ class SettingsDialog(QDialog):
             QMessageBox.StandardButton.No,
         )
         if answer != QMessageBox.StandardButton.Yes:
-            self.install_log.append("用户已取消安装，未执行任何命令。")
+            self.install_log.appendPlainText("用户已取消安装，未执行任何命令。")
             return
-        self.install_log.append(f"开始通过 {method} 安装 OpenCode……")
+        self.install_log.appendPlainText(f"开始通过 {method} 安装 OpenCode……")
         self._set_install_controls_enabled(False)
         thread = QThread(self)
         worker = _OpenCodeInstallWorker(self.coding_agent_installer, method)
@@ -947,18 +985,20 @@ class SettingsDialog(QDialog):
         stdout = str(result.get("stdout") or "").strip()
         stderr = str(result.get("stderr") or "").strip()
         if stdout:
-            self.install_log.append(stdout)
+            self.install_log.appendPlainText(stdout)
         if stderr:
-            self.install_log.append(stderr)
+            self.install_log.appendPlainText(stderr)
         if result.get("success"):
-            self.install_log.append("OpenCode 安装成功，重新检测已通过。")
+            self.install_log.appendPlainText("OpenCode 安装成功，重新检测已通过。")
             provider_index = self.coding_agent_provider.findData("opencode")
             self.coding_agent_provider.setCurrentIndex(max(0, provider_index))
             self.coding_agent_command.setText("opencode")
             self.coding_agent_dry_run.setChecked(True)
             self.coding_agent_test_result.setText("可用")
         else:
-            self.install_log.append(f"OpenCode 安装失败：{result.get('error') or '未知错误'}")
+            self.install_log.appendPlainText(
+                f"OpenCode 安装失败：{result.get('error') or '未知错误'}"
+            )
 
     def _clear_install_thread(self) -> None:
         self._install_thread = None
@@ -1070,6 +1110,7 @@ class SettingsDialog(QDialog):
             "api_key": self.api_key.text().strip(),
             "personality_preset": self.personality.currentData(),
             "custom_personality": self.custom_personality.toPlainText().strip(),
+            "launch_on_startup": self.launch_on_startup.isChecked(),
             "network_enabled": self.network_enabled.isChecked(),
             "network_timeout": self.network_timeout.value(),
             "network_show_sources": self.network_show_sources.isChecked(),
@@ -1105,7 +1146,13 @@ class SettingsDialog(QDialog):
         }
         if not values["base_url"] or not values["chat_model"] or not values["technical_model"]:
             return
-        self.controller.apply_settings(values)
+        result = self.controller.apply_settings(values)
+        if isinstance(result, dict) and result.get("autostart_error"):
+            QMessageBox.warning(
+                self,
+                "开机自启动未应用",
+                str(result["autostart_error"]),
+            )
         self.accept()
 
     def reject(self) -> None:

@@ -11,6 +11,7 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
 | `ai` | 主聊天 provider、Base URL、模型、Key 和超时 |
 | `codex` | 技术问题所用模型、地址、Key 和超时 |
 | `personality` | 人格预设和自定义提示词 |
+| `startup` | 当前 Windows 用户登录后的自动启动开关 |
 | `movement` | 行走、奔跑、加速度和光标追逐 |
 | `window` | 窗口尺寸、最小尺寸、置顶和透明度 |
 | `fence` | 围栏边框显示 |
@@ -22,6 +23,21 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
 | `coding_agent` | 本地 OpenCode/Codex provider、命令、超时和 dry-run 开关 |
 
 缺少较新的字段时，`ConfigStore` 会补入安全默认值。打包默认配置位于 `packaging/config.json`，其中不得包含真实 Key。
+
+## 开机自启动
+
+```json
+{
+  "startup": {
+    "launch_on_login": false
+  }
+}
+```
+
+通过“设置 → 常规与性格”启用后，Maidie 会在当前用户的
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 中写入启动项，不需要管理员权限。
+关闭选项会删除该启动项；卸载安装版 Maidie 时也会清理它。开发模式会使用同一虚拟环境的
+`pythonw.exe` 启动 `main.py`，打包模式直接启动 `Maidie.exe`。
 
 ## 动画后端
 
@@ -72,13 +88,13 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
 ```json
 {
   "personality": {
-    "preset": "gentle_tsundere",
+    "preset": "wjk_idol",
     "custom_prompt": ""
   }
 }
 ```
 
-内置预设：`gentle_tsundere`、`cheerful`、`healing`、`elegant_maid`、`custom`。只有 `custom` 使用自定义描述。
+默认预设是 `wjk_idol`（WJK 爱豆）。内置预设：`wjk_idol`、`gentle_tsundere`、`cheerful`、`healing`、`elegant_maid`、`custom`。只有 `custom` 使用自定义描述。
 
 ## 移动、窗口和围栏
 

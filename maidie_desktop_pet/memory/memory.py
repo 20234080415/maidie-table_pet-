@@ -142,7 +142,13 @@ class ConversationMemory:
         except (sqlite3.Error, OSError, TypeError, ValueError):
             return False
 
-    def save_extracted(self, extracted: dict[str, Any], *, generation: int | None = None) -> bool:
+    def save_extracted(
+        self,
+        extracted: dict[str, Any],
+        *,
+        generation: int | None = None,
+        source_message: str = "",
+    ) -> bool:
         if not isinstance(extracted, dict):
             return False
         with self._lock:
@@ -157,13 +163,53 @@ class ConversationMemory:
                     continue
                 for item in items[:20]:
                     if isinstance(item, dict):
+                        key = str(item.get("key", ""))
+                        value = str(item.get("value", ""))
+                        if not self._is_supported_extracted_memory(
+                            key, value, source_message
+                        ):
+                            continue
                         self.save_memory(
                             memory_type,
-                            str(item.get("key", "")),
-                            str(item.get("value", "")),
+                            key,
+                            value,
                             float(item.get("importance", default_importance)),
                         )
             return True
+
+    @staticmethod
+    def _is_supported_extracted_memory(
+        key: str, value: str, source_message: str
+    ) -> bool:
+        """Reject identity/roleplay memories inferred from the assistant's own reply."""
+        source = str(source_message or "").strip()
+        if not source:
+            return True
+        normalized_key = str(key).strip().lower()
+        normalized_value = str(value).strip().lower()
+        identity_tokens = (
+            "name", "nickname", "form_of_address", "姓名", "名字", "昵称", "称呼", "叫法",
+        )
+        if any(token in normalized_key for token in identity_tokens):
+            explicit_name = re.search(
+                r"(?:叫我|称呼我|喊我|我叫|我的(?:名字|昵称)(?:是|叫))",
+                source,
+                re.IGNORECASE,
+            )
+            return bool(
+                explicit_name
+                and normalized_value
+                and normalized_value in source.lower()
+            )
+        role_tokens = (
+            "roleplay", "role_play", "persona", "角色扮演", "人格", "人设", "角色风格",
+        )
+        if any(token in normalized_key for token in role_tokens):
+            return bool(
+                re.search(r"(?:我喜欢|我偏好|我希望|我想要|请用|改成|设为)", source)
+                and re.search(r"(?:人格|人设|角色|扮演|语气|风格|爱豆|女仆|傲娇)", source)
+            )
+        return True
 
     def load_memories(self, limit: int = 20) -> list[dict[str, Any]]:
         try:

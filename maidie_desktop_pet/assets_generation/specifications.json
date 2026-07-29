@@ -1,0 +1,274 @@
+{
+  "character": "new_maidie_plush",
+  "reference_image": "用户提供的《桌宠基准图》，生成时必须作为角色参考图导入",
+  "background": {
+    "preferred": "transparent",
+    "fallback_chroma_key": "#00FF00",
+    "rules": "纯透明或完全均匀色键背景；无地面、阴影、渐变、纹理、反射、文字、水印和边框"
+  },
+  "cell": {
+    "width": 192,
+    "height": 208
+  },
+  "atlas": {
+    "source_file": "assets/spritesheet.webp",
+    "output_file": "assets/spritesheet.webp",
+    "width": 1536,
+    "height": 1872,
+    "columns": 8,
+    "rows": 9,
+    "format": "lossless RGBA WebP",
+    "runtime_loader": "animation/atlas.py",
+    "runtime_mirroring": "ui/sprite.py 在最终渲染边界将 row 1 镜像为左向移动；不修改该逻辑"
+  },
+  "atlas_rows": [
+    {
+      "state": "idle",
+      "row": 0,
+      "source_file": "assets/spritesheet.webp#row=0",
+      "generated_strip": "assets_generation/output/idle.png",
+      "prompt_file": "assets_generation/prompts/idle.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "idle", "interval_ms": 190, "fps": 5.263, "cycle_ms": 1140},
+        {"name": "sleeping", "interval_ms": 420, "fps": 2.381, "cycle_ms": 2520}
+      ]
+    },
+    {
+      "state": "running-right",
+      "row": 1,
+      "source_file": "assets/spritesheet.webp#row=1",
+      "generated_strip": "assets_generation/output/running_right.png",
+      "prompt_file": "assets_generation/prompts/running_right.txt",
+      "width": 1536,
+      "height": 208,
+      "frames": 8,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "walk", "interval_ms": 185, "fps": 5.405, "cycle_ms": 1480},
+        {"name": "run", "interval_ms": 95, "fps": 10.526, "cycle_ms": 760}
+      ]
+    },
+    {
+      "state": "running-left",
+      "row": 2,
+      "source_file": "assets/spritesheet.webp#row=2",
+      "generated_strip": "assets_generation/output/running_left.png",
+      "prompt_file": "assets_generation/prompts/running_left.txt",
+      "width": 1536,
+      "height": 208,
+      "frames": 8,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_used": false,
+      "compatibility_note": "保留现有 8×9 图集格式；当前运行时实际通过镜像 row 1 得到左向移动",
+      "reference_fps": 5.405
+    },
+    {
+      "state": "waving",
+      "row": 3,
+      "source_file": "assets/spritesheet.webp#row=3",
+      "generated_strip": "assets_generation/output/waving.png",
+      "prompt_file": "assets_generation/prompts/waving.txt",
+      "width": 768,
+      "height": 208,
+      "frames": 4,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "talking", "interval_ms": 180, "fps": 5.556, "cycle_ms": 720},
+        {"name": "reacting", "interval_ms": 180, "fps": 5.556, "cycle_ms": 720}
+      ]
+    },
+    {
+      "state": "jumping",
+      "row": 4,
+      "source_file": "assets/spritesheet.webp#row=4",
+      "generated_strip": "assets_generation/output/jumping.png",
+      "prompt_file": "assets_generation/prompts/jumping.txt",
+      "width": 960,
+      "height": 208,
+      "frames": 5,
+      "baseline_y": [202, 178, 151, 178, 202],
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "happy", "interval_ms": 135, "fps": 7.407, "cycle_ms": 675, "render_scale": 1.3}
+      ]
+    },
+    {
+      "state": "failed",
+      "row": 5,
+      "source_file": "assets/spritesheet.webp#row=5",
+      "generated_strip": "assets_generation/output/failed.png",
+      "prompt_file": "assets_generation/prompts/failed.txt",
+      "width": 1536,
+      "height": 208,
+      "frames": 8,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "failed", "interval_ms": 210, "fps": 4.762, "cycle_ms": 1680}
+      ]
+    },
+    {
+      "state": "waiting",
+      "row": 6,
+      "source_file": "assets/spritesheet.webp#row=6",
+      "generated_strip": "assets_generation/output/waiting.png",
+      "prompt_file": "assets_generation/prompts/waiting.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "waiting", "interval_ms": 200, "fps": 5.0, "cycle_ms": 1200}
+      ]
+    },
+    {
+      "state": "running",
+      "row": 7,
+      "source_file": "assets/spritesheet.webp#row=7",
+      "generated_strip": "assets_generation/output/running.png",
+      "prompt_file": "assets_generation/prompts/running.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "thinking", "interval_ms": 170, "fps": 5.882, "cycle_ms": 1020}
+      ],
+      "semantic_note": "此物理行表示任务处理/思考，不是角色脚步奔跑"
+    },
+    {
+      "state": "review",
+      "row": 8,
+      "source_file": "assets/spritesheet.webp#row=8",
+      "generated_strip": "assets_generation/output/review.png",
+      "prompt_file": "assets_generation/prompts/review.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "baseline_y": 202,
+      "loop": true,
+      "runtime_mappings": [
+        {"name": "review", "interval_ms": 190, "fps": 5.263, "cycle_ms": 1140}
+      ]
+    }
+  ],
+  "external_actions": [
+    {
+      "state": "headpat",
+      "source_file": "assets/actions/headpat.webp",
+      "generated_strip": "assets_generation/output/headpat.png",
+      "output_file": "assets/actions/headpat.webp",
+      "prompt_file": "assets_generation/prompts/headpat.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 150,
+      "fps": 6.667,
+      "loop": false,
+      "playback_span_ms": 900,
+      "action_duration_ms": 1100,
+      "baseline_y": 203
+    },
+    {
+      "state": "facepoke",
+      "source_file": "assets/actions/facepoke.webp",
+      "generated_strip": "assets_generation/output/facepoke.png",
+      "output_file": "assets/actions/facepoke.webp",
+      "prompt_file": "assets_generation/prompts/facepoke.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 155,
+      "fps": 6.452,
+      "loop": false,
+      "playback_span_ms": 930,
+      "action_duration_ms": 1100,
+      "baseline_y": 203
+    },
+    {
+      "state": "shy",
+      "source_file": "assets/actions/shy.webp",
+      "generated_strip": "assets_generation/output/shy.png",
+      "output_file": "assets/actions/shy.webp",
+      "prompt_file": "assets_generation/prompts/shy.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 175,
+      "fps": 5.714,
+      "loop": false,
+      "playback_span_ms": 1050,
+      "action_duration_ms": 3000,
+      "baseline_y": 203
+    },
+    {
+      "state": "celebrate",
+      "source_file": "assets/actions/celebrate.webp",
+      "generated_strip": "assets_generation/output/celebrate.png",
+      "output_file": "assets/actions/celebrate.webp",
+      "prompt_file": "assets_generation/prompts/celebrate.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 140,
+      "fps": 7.143,
+      "loop": false,
+      "playback_span_ms": 840,
+      "action_duration_ms": 3000,
+      "baseline_y": 203
+    },
+    {
+      "state": "sleepy",
+      "source_file": "assets/actions/sleepy.webp",
+      "generated_strip": "assets_generation/output/sleepy.png",
+      "output_file": "assets/actions/sleepy.webp",
+      "prompt_file": "assets_generation/prompts/sleepy.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 240,
+      "fps": 4.167,
+      "loop": false,
+      "playback_span_ms": 1440,
+      "action_duration_ms": 1600,
+      "baseline_y": 203
+    },
+    {
+      "state": "dizzy-right",
+      "source_file": "assets/actions/dizzy-right.webp",
+      "generated_strip": "assets_generation/output/dizzy_right.png",
+      "output_file": "assets/actions/dizzy-right.webp",
+      "prompt_file": "assets_generation/prompts/dizzy_right.txt",
+      "width": 1152,
+      "height": 208,
+      "frames": 6,
+      "interval_ms": 155,
+      "fps": 6.452,
+      "loop": false,
+      "playback_span_ms": 930,
+      "action_duration_ms": 1100,
+      "baseline_y": 203
+    }
+  ],
+  "legacy_unreferenced_assets": [
+    "assets/maidie.png",
+    "assets/maidie_idle.gif",
+    "assets/maidie_happy.gif",
+    "assets/maidie_sad.gif",
+    "assets/maidie_sleep.gif",
+    "assets/maidie_talk.gif",
+    "assets/maidie_thinking.gif",
+    "assets/actions/*.gif"
+  ],
+  "legacy_note": "上述文件未被当前精灵加载器引用，本次仅提供提示词，不要求生成或替换它们。"
+}

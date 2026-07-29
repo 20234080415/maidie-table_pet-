@@ -43,6 +43,7 @@ from core.brain import BrainRouter, Synthesizer
 from core.pet import PetController
 from core.actions import ActionRegistry
 from core.settings import ConfigStore
+from core.autostart import WindowsAutostartManager
 from core.plugins.network import NetworkPlugin
 from core.tools import (CodingAgentTool, MemoryTool, ScreenTool, SearchTool, SystemTool, TimeTool,
                         ToolRegistry, WeatherTool)
@@ -58,6 +59,7 @@ from animation.model_manager import AnimationModelRegistry
 from input.manager import InputManager
 from memory.memory import ConversationMemory
 from ui.window import PetWindow
+from ui.theme import apply_application_theme
 from utils.logger import setup_logger
 
 
@@ -114,9 +116,11 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(APP_VERSION)
     app.setQuitOnLastWindowClosed(True)
+    apply_application_theme(app)
 
     config_store = ConfigStore(ROOT / "config" / "config.json")
     config = config_store.load()
+    autostart_manager = WindowsAutostartManager(ROOT)
     if force_sprite:
         config = apply_safe_backend_override(config, True)
         logger.warning("Safe startup requested with --force-sprite; Live2D config ignored.")
@@ -180,6 +184,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         action_registry=ActionRegistry(ROOT / "assets" / "actions" / "actions.json"),
         proactive_runtime=proactive_runtime,
         proactive_tick_seconds=int(proactive_options.get("tick_seconds", 45)),
+        autostart_manager=autostart_manager,
     )
     controller.cursor_chase = cursor_chase
     controller.register_plugin(network_plugin)
