@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit, urlunsplit
 
+import requests
+
 from network.client import NetworkClient
 from network.schemas import NetworkResult
 
@@ -99,3 +101,77 @@ class SearchService:
             if len(sources) >= limit:
                 break
         return sources, snippets, scores
+
+
+class InviteSearchService:
+    """Tavily search through Maidie's cloud using the shared invite token."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        user_token: str,
+        timeout: int = 10,
+        request_session=requests,
+    ) -> None:
+        self.endpoint = endpoint
+        self.user_token = user_token
+        self.timeout = timeout
+        self._requests = request_session
+
+    def search(self, query: str) -> dict:
+        query = str(query).strip()
+        if not query:
+            return NetworkResult(
+                error="搜索内容为空。", failure_reason="EMPTY_QUERY"
+            ).to_dict()
+        if not self.endpoint or not self.user_token:
+            return NetworkResult(
+                error="邀请码搜索服务尚未配置。",
+                failure_reason="API_KEY_MISSING",
+            ).to_dict()
+        try:
+            response = self._requests.post(
+                self.endpoint,
+                headers={
+                    "Authorization": f"Bearer {self.user_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"query": query},
+                timeout=self.timeout,
+            )
+            if response.status_code == 401:
+                return NetworkResult(
+                    error="邀请码授权已失效。",
+                    failure_reason="API_KEY_MISSING",
+                ).to_dict()
+            response.raise_for_status()
+            payload = response.json()
+            result = payload.get("result")
+            if not payload.get("success") or not isinstance(result, dict):
+                raise ValueError(str(payload.get("error") or "cloud_search_failed"))
+            raw_sources = (
+                result.get("sources")
+                if isinstance(result.get("sources"), list)
+                else []
+            )
+            sources, _snippets, _scores = SearchService._normalize_sources(
+                raw_sources
+            )
+            return NetworkResult(
+                ok=bool(result.get("ok")),
+                title=str(result.get("title") or f"“{query}”的联网查询结果"),
+                summary=str(result.get("summary") or "")[:4000],
+                sources=sources,
+                error=str(result.get("error") or ""),
+                failure_reason=str(result.get("failure_reason") or ""),
+                result_count=len(sources),
+            ).to_dict()
+        except requests.Timeout:
+            return NetworkResult(
+                error="联网查询超时。", failure_reason="TIMEOUT"
+            ).to_dict()
+        except Exception:
+            return NetworkResult(
+                error="联网查询暂时不可用。",
+                failure_reason="NETWORK_ERROR",
+            ).to_dict()

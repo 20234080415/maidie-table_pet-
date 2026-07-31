@@ -11,8 +11,10 @@ import os
 from time import monotonic, sleep
 from typing import Callable
 
+from core.cloud import cloud_endpoint
 from core.vision.image_preprocess import preprocess_for_vl
 from core.vision.errors import VisionCaptureError
+from core.vision.invite_vl_client import InviteVisionClient
 from core.vision.qwen_vl_client import QwenVLClient
 from core.vision.screen_capture import ScreenCapture
 from core.vision.vision_context import VisionContext
@@ -36,7 +38,8 @@ class VisionService:
                  cursor_region_width: int = 1000,
                  cursor_region_height: int = 800) -> None:
         self.capture = capture or ScreenCapture()
-        self.client = client or QwenVLClient()
+        self._custom_client = client or QwenVLClient()
+        self.client = self._custom_client
         self.max_width = max_width or self._env_int("VISION_MAX_WIDTH", 1280)
         self.jpeg_quality = jpeg_quality or self._env_int("VISION_JPEG_QUALITY", 85)
         self.cache_ttl_seconds = (cache_ttl_seconds if cache_ttl_seconds is not None else
@@ -55,18 +58,47 @@ class VisionService:
 
     def reconfigure(self, settings: dict[str, object]) -> None:
         """Apply saved UI settings while keeping environment variables authoritative."""
-        self.client.api_key = os.getenv("DASHSCOPE_API_KEY") or str(settings.get("api_key", ""))
-        self.client.workspace_id = (os.getenv("DASHSCOPE_WORKSPACE_ID") or
-                                    str(settings.get("workspace_id", "")))
-        self.client.region = os.getenv("QWEN_VL_REGION") or str(
-            settings.get("region", "cn-beijing")
+        api_key = os.getenv("DASHSCOPE_API_KEY") or str(settings.get("api_key", ""))
+        workspace_id = (
+            os.getenv("DASHSCOPE_WORKSPACE_ID")
+            or str(settings.get("workspace_id", ""))
         )
-        self.client.model = os.getenv("QWEN_VL_MODEL") or str(
-            settings.get("model", "qwen3-vl-flash")
-        )
-        self.client.base_url = self.client.build_base_url(
-            self.client.workspace_id, self.client.region
-        )
+        user_token = str(settings.get("_user_token", "")).strip()
+        cloud = settings.get("_cloud", {})
+        cloud = cloud if isinstance(cloud, dict) else {}
+        invite_endpoint = cloud_endpoint(cloud, "vision")
+        if api_key and workspace_id:
+            self.client = self._custom_client
+            self.client.api_key = api_key
+            self.client.workspace_id = workspace_id
+            self.client.region = os.getenv("QWEN_VL_REGION") or str(
+                settings.get("region", "cn-beijing")
+            )
+            self.client.model = os.getenv("QWEN_VL_MODEL") or str(
+                settings.get("model", "qwen3-vl-flash")
+            )
+            self.client.base_url = self.client.build_base_url(
+                self.client.workspace_id, self.client.region
+            )
+        elif user_token and invite_endpoint:
+            self.client = InviteVisionClient(
+                invite_endpoint,
+                user_token,
+                timeout=float(cloud.get("timeout", 30)),
+            )
+        else:
+            self.client = self._custom_client
+            self.client.api_key = api_key
+            self.client.workspace_id = workspace_id
+            self.client.region = os.getenv("QWEN_VL_REGION") or str(
+                settings.get("region", "cn-beijing")
+            )
+            self.client.model = os.getenv("QWEN_VL_MODEL") or str(
+                settings.get("model", "qwen3-vl-flash")
+            )
+            self.client.base_url = self.client.build_base_url(
+                self.client.workspace_id, self.client.region
+            )
         self.max_width = self._setting_int(settings, "max_width", "VISION_MAX_WIDTH", 1280)
         self.jpeg_quality = self._setting_int(
             settings, "jpeg_quality", "VISION_JPEG_QUALITY", 85

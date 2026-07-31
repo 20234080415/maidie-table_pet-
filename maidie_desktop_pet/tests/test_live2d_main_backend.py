@@ -98,7 +98,7 @@ class MainWindowMenuTests(unittest.TestCase):
         import inspect
         from ui.live2d_main_window import Live2DMainWindow
         source = inspect.getsource(Live2DMainWindow._build_context_menu)
-        for label in ("打开设置", "切回 Sprite", "重置 Live2D 显示参数", "关闭 Maidie"):
+        for label in ("super()._build_context_menu()", "切回 Sprite", "重置 Live2D 显示参数"):
             self.assertIn(label, source)
 
     @patch("ui.live2d_main_window.QMessageBox.information")

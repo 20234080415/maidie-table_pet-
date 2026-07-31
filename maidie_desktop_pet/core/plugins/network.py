@@ -9,9 +9,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from core.cloud import cloud_endpoint
 from core.plugins.base import Plugin
 from network.schemas import NetworkResult
-from network.search import SearchService
+from network.search import InviteSearchService, SearchService
 
 
 class NetworkPlugin(Plugin):
@@ -36,9 +37,24 @@ class NetworkPlugin(Plugin):
         self.show_sources = bool(settings.get("show_sources", True))
         self.search_provider = str(settings.get("search_provider", "tavily"))
         self.search_api_key = str(settings.get("search_api_key", ""))
-        self.search_service = self._injected_service or SearchService(
-            self.search_provider, self.search_api_key, self.timeout
-        )
+        self.user_token = str(settings.get("_user_token", "")).strip()
+        cloud = settings.get("_cloud", {})
+        cloud = cloud if isinstance(cloud, dict) else {}
+        self.invite_search_endpoint = cloud_endpoint(cloud, "search")
+        if self._injected_service is not None:
+            self.search_service = self._injected_service
+        elif self.search_api_key:
+            self.search_service = SearchService(
+                self.search_provider, self.search_api_key, self.timeout
+            )
+        elif self.user_token:
+            self.search_service = InviteSearchService(
+                self.invite_search_endpoint, self.user_token, self.timeout
+            )
+        else:
+            self.search_service = SearchService(
+                self.search_provider, "", self.timeout
+            )
 
     def should_handle(self, message: str) -> bool:
         return self.enabled and bool(self.INTENT_PATTERN.search(message.strip()))
@@ -46,8 +62,9 @@ class NetworkPlugin(Plugin):
     def handle(self, message: str) -> dict:
         if not self.enabled:
             return NetworkResult(error="联网查询未开启。",
-                                 failure_reason=("API_KEY_MISSING" if not self.search_api_key
-                                                 else "UNKNOWN_ERROR")).to_dict()
+                                 failure_reason=("API_KEY_MISSING" if not (
+                                     self.search_api_key or self.user_token)
+                                                  else "UNKNOWN_ERROR")).to_dict()
         try:
             return self.search_service.search(message.strip())
         except Exception as exc:

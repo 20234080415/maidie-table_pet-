@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import json
+import os
+import uuid
 from copy import deepcopy
 from pathlib import Path
 from threading import RLock
@@ -71,6 +73,15 @@ ANIMATION_DEFAULTS = {
     "live2d_fit_padding": 0.80,
 }
 STARTUP_DEFAULTS = {"launch_on_login": False}
+AI_MODES = {"custom", "invite", "disabled"}
+CLOUD_DEFAULTS = {
+    "base_url": "https://yfihoiziesvsimcowmda.supabase.co",
+    "verify_invite_path": "/functions/v1/verify-invite",
+    "chat_path": "/functions/v1/maidie-chat",
+    "search_path": "/functions/v1/maidie-search",
+    "vision_path": "/functions/v1/maidie-vision",
+    "timeout": 30,
+}
 
 
 class ConfigStore:
@@ -138,6 +149,32 @@ class ConfigStore:
             startup = config.setdefault("startup", {})
             for key, value in STARTUP_DEFAULTS.items():
                 startup.setdefault(key, value)
+            cloud = config.setdefault("cloud", {})
+            for key, value in CLOUD_DEFAULTS.items():
+                cloud.setdefault(key, value)
+            cloud["base_url"] = str(
+                os.getenv("MAIDIE_CLOUD_BASE_URL") or cloud.get("base_url", "")
+            ).rstrip("/")
+            cloud["verify_invite_path"] = str(
+                cloud.get("verify_invite_path") or CLOUD_DEFAULTS["verify_invite_path"]
+            )
+            cloud["chat_path"] = str(
+                cloud.get("chat_path") or CLOUD_DEFAULTS["chat_path"]
+            )
+            cloud["search_path"] = str(
+                cloud.get("search_path") or CLOUD_DEFAULTS["search_path"]
+            )
+            cloud["vision_path"] = str(
+                cloud.get("vision_path") or CLOUD_DEFAULTS["vision_path"]
+            )
+            try:
+                cloud_timeout = int(cloud.get("timeout", CLOUD_DEFAULTS["timeout"]))
+            except (TypeError, ValueError):
+                cloud_timeout = CLOUD_DEFAULTS["timeout"]
+            cloud["timeout"] = max(5, min(120, cloud_timeout))
+            config["user_token"] = str(config.get("user_token") or "").strip()
+            config["device_id"] = str(config.get("device_id") or "").strip()
+            config["ai_mode"] = self.effective_ai_mode(config)
             return config
 
     def public_settings(self) -> dict[str, Any]:
@@ -152,8 +189,12 @@ class ConfigStore:
         coding_agent = config.get("coding_agent", {})
         animation = config.get("animation", {})
         startup = config.get("startup", {})
+        cloud = config.get("cloud", {})
         key = str(ai.get("api_key", ""))
         return {
+            "ai_mode": self.effective_ai_mode(config),
+            "has_user_token": bool(str(config.get("user_token") or "").strip()),
+            "cloud_configured": bool(str(cloud.get("base_url") or "").strip()),
             "provider": ai.get("provider", "deepseek"),
             "base_url": ai.get("base_url", "https://api.deepseek.com"),
             "chat_model": ai.get("model", "deepseek-v4-flash"),
@@ -228,6 +269,10 @@ class ConfigStore:
             if new_key:
                 ai["api_key"] = new_key
                 technical["api_key"] = new_key
+                config["ai_mode"] = "custom"
+            requested_mode = str(values.get("ai_mode", "")).strip().lower()
+            if requested_mode in AI_MODES and not new_key:
+                config["ai_mode"] = requested_mode
             network["enabled"] = bool(values.get("network_enabled", network.get("enabled", False)))
             network["timeout"] = max(1, int(values.get("network_timeout", network.get("timeout", 10))))
             network["show_sources"] = bool(values.get("network_show_sources", network.get("show_sources", True)))
@@ -311,6 +356,55 @@ class ConfigStore:
                     "launch_on_startup", startup.get("launch_on_login", False)
                 )
             )
+            config["ai_mode"] = self.effective_ai_mode(config)
+            self._atomic_write(config)
+            return deepcopy(config)
+
+    def effective_ai_mode(self, config: dict[str, Any] | None = None) -> str:
+        """Resolve custom first, then invite, so legacy API users keep priority."""
+        if config is None:
+            with self._lock:
+                config = json.loads(self.path.read_text(encoding="utf-8"))
+        ai = config.get("ai", {})
+        provider = str(ai.get("provider") or "deepseek")
+        environment_key = (
+            os.getenv("DEEPSEEK_API_KEY") if provider == "deepseek" else ""
+        )
+        api_key = str(environment_key or ai.get("api_key") or "").strip()
+        if api_key and api_key != "YOUR_API_KEY_HERE":
+            return "custom"
+        if str(config.get("user_token") or "").strip():
+            return "invite"
+        return "disabled"
+
+    def ensure_device_id(self) -> str:
+        """Return a random installation identifier without exposing machine details."""
+        with self._lock:
+            config = self.load()
+            device_id = str(config.get("device_id") or "").strip()
+            if device_id:
+                return device_id
+            device_id = str(uuid.uuid4())
+            config["device_id"] = device_id
+            self._atomic_write(config)
+            return device_id
+
+    def save_invite_token(self, token: str) -> dict[str, Any]:
+        clean_token = str(token or "").strip()
+        if not clean_token:
+            raise ValueError("邀请码服务未返回有效 token")
+        with self._lock:
+            config = self.load()
+            config["user_token"] = clean_token
+            config["ai_mode"] = self.effective_ai_mode(config)
+            self._atomic_write(config)
+            return deepcopy(config)
+
+    def clear_invite_token(self) -> dict[str, Any]:
+        with self._lock:
+            config = self.load()
+            config["user_token"] = ""
+            config["ai_mode"] = self.effective_ai_mode(config)
             self._atomic_write(config)
             return deepcopy(config)
 

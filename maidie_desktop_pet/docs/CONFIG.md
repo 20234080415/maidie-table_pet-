@@ -8,8 +8,12 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
 
 | 分组 | 用途 |
 |---|---|
+| `ai_mode` | 当前有效 AI 模式：`custom`、`invite` 或 `disabled` |
+| `user_token` | 邀请码激活后保存的不透明用户 token，不是模型供应商 API Key |
+| `device_id` | 本次安装随机生成的设备标识，不采集主机名或硬件序列号 |
 | `ai` | 主聊天 provider、Base URL、模型、Key 和超时 |
 | `codex` | 技术问题所用模型、地址、Key 和超时 |
+| `cloud` | Maidie 邀请码验证和云端 AI 函数地址 |
 | `personality` | 人格预设和自定义提示词 |
 | `startup` | 当前 Windows 用户登录后的自动启动开关 |
 | `movement` | 行走、奔跑、加速度和光标追逐 |
@@ -65,6 +69,9 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
 
 ```json
 {
+  "ai_mode": "disabled",
+  "user_token": "",
+  "device_id": "",
   "ai": {
     "provider": "deepseek",
     "api_key": "",
@@ -77,11 +84,21 @@ Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中�
     "base_url": "https://api.deepseek.com",
     "model": "deepseek-v4-pro",
     "timeout": 90
+  },
+  "cloud": {
+    "base_url": "https://yfihoiziesvsimcowmda.supabase.co",
+    "verify_invite_path": "/functions/v1/verify-invite",
+    "chat_path": "/functions/v1/maidie-chat",
+    "search_path": "/functions/v1/maidie-search",
+    "vision_path": "/functions/v1/maidie-vision",
+    "timeout": 30
   }
 }
 ```
 
-接口应兼容 OpenAI Chat Completions。主 AI Key 可由 `DEEPSEEK_API_KEY` 提供，环境变量优先于 JSON。
+启动时按“自己的 API → 邀请码 token → 未配置”解析有效模式，因此已有 API 用户不会被邀请码模式覆盖。接口应兼容 OpenAI Chat Completions；主 AI Key 可由 `DEEPSEEK_API_KEY` 提供，环境变量优先于 JSON。
+
+邀请码模式只在本地保存一个 `user_token`；该 token 同时授权默认大模型、Tavily 搜索和千问视觉，三类供应商 API Key 均只存在于 Supabase Edge Function Secret。用户自己填写的 Tavily Key 或完整千问 Key + Workspace 配置仍分别优先于邀请码代理。删除 `user_token` 且没有自定义主 AI Key 时，模式会恢复为 `disabled`，下次启动重新显示 AI 服务选择。
 
 ## 人格
 

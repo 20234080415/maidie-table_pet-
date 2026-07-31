@@ -325,6 +325,17 @@ class SettingsDialog(QDialog):
     def _build_model_tab(self) -> QWidget:
         page = QWidget()
         layout = QFormLayout(page)
+        mode_names = {
+            "custom": "自己的 API",
+            "invite": "邀请码默认服务",
+            "disabled": "未配置",
+        }
+        self.ai_mode_label = QLabel(
+            mode_names.get(self.settings.get("ai_mode", "disabled"), "未配置")
+        )
+        self.ai_mode_label.setObjectName("settingHint")
+        invite_button = QPushButton("输入邀请码")
+        invite_button.clicked.connect(self._open_invite_dialog)
         self.provider = QComboBox()
         self.provider.addItem("DeepSeek", "deepseek")
         self.provider.addItem("其他 OpenAI 兼容接口", "custom")
@@ -338,8 +349,13 @@ class SettingsDialog(QDialog):
         self.api_key.setPlaceholderText(
             "已配置；留空保持不变" if self.settings.get("has_api_key") else "输入 API Key"
         )
-        note = QLabel("Key 以密码形式输入。若系统设置了 DEEPSEEK_API_KEY，环境变量优先。")
+        note = QLabel(
+            "填写 Key 后会优先使用自己的接口；邀请码模式不会把默认服务的 API Key "
+            "保存到本机。若系统设置了 DEEPSEEK_API_KEY，环境变量优先。"
+        )
         note.setWordWrap(True)
+        layout.addRow("当前 AI 模式", self.ai_mode_label)
+        layout.addRow("统一邀请码（AI / 搜索 / 视觉）", invite_button)
         layout.addRow("接口类型", self.provider)
         layout.addRow("Base URL", self.base_url)
         layout.addRow("聊天模型", self.chat_model)
@@ -347,6 +363,21 @@ class SettingsDialog(QDialog):
         layout.addRow("API Key", self.api_key)
         layout.addRow("", note)
         return page
+
+    def _open_invite_dialog(self) -> None:
+        from ui.invite_dialog import InviteCodeDialog
+
+        dialog = InviteCodeDialog(self.controller.activate_invite, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self.settings = self.controller.settings_snapshot()
+        self.ai_mode_label.setText(
+            {
+                "custom": "自己的 API",
+                "invite": "邀请码默认服务",
+                "disabled": "未配置",
+            }.get(self.settings.get("ai_mode"), "未配置")
+        )
 
     def _build_network_tab(self) -> QWidget:
         page = QWidget()
@@ -373,7 +404,10 @@ class SettingsDialog(QDialog):
         self.network_show_sources.setChecked(
             self.settings.get("network_show_sources", True)
         )
-        note = QLabel("联网默认关闭。开启后，只会把当前问题发送给所选搜索服务。")
+        note = QLabel(
+            "联网默认关闭。邀请码已激活且这里没有填写 Tavily Key 时，会使用同一个"
+            "邀请码 token 调用默认搜索服务。填写自己的 Key 后仍优先使用自己的接口。"
+        )
         note.setWordWrap(True)
         layout.addRow("联网开关", self.network_enabled)
         layout.addRow("搜索服务", self.network_provider)
@@ -1071,7 +1105,8 @@ class SettingsDialog(QDialog):
         )
         note = QLabel(
             "只有你明确要求看屏幕、窗口或图片时才会截图并发送给千问视觉；"
-            "截图仅在内存中处理，不会永久保存。环境变量配置优先于这里的设置。"
+            "截图仅在内存中处理，不会永久保存。邀请码已激活且这里没有完整填写"
+            "千问配置时，会使用同一个邀请码 token；环境变量和自有配置仍优先。"
         )
         note.setWordWrap(True)
         layout.addRow("Workspace ID", self.vision_workspace_id)

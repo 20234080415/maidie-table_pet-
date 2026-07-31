@@ -78,12 +78,48 @@ class ShutdownTests(unittest.TestCase):
         menu = window._build_context_menu()
         actions = {action.text(): action for action in menu.actions() if action.text()}
         for label in (
-            "和 Maidie 聊天", "设置", "帮助与说明",
-            "关于 Maidie", "检查更新", "退出",
+            "🧸  Maidie", "💬  聊聊", "✨  我的 Maidie",
+            "📖  Maidie 日记", "🎨  更换皮肤", "⚙  设置",
+            "🧱  锁定位置", "❓  帮助与说明", "🚪  退出",
         ):
             self.assertIn(label, actions)
-        self.assertNotIn("模型设置", actions)
-        self.assertFalse(actions["检查更新"].isEnabled())
+        for old_label in ("放大 10%", "缩小 10%", "恢复默认大小", "检查更新"):
+            self.assertNotIn(old_label, actions)
+
+        settings_menu = actions["⚙  设置"].menu()
+        self.assertIsNotNone(settings_menu)
+        settings_actions = {
+            action.text(): action
+            for action in settings_menu.actions()
+            if action.text()
+        }
+        for label in (
+            "🎞  动画设置", "🔊  声音设置", "🤖  AI 设置",
+            "🚀  开机启动", "👗  外观设置",
+        ):
+            self.assertIn(label, settings_actions)
+        appearance = settings_actions["👗  外观设置"].menu()
+        self.assertIsNotNone(appearance)
+        self.assertEqual(
+            [action.text() for action in appearance.actions() if action.text()],
+            ["打开外观设置", "放大 10%", "缩小 10%", "恢复默认大小"],
+        )
+        window.shutdown()
+        window.close()
+
+    def test_lock_position_action_reuses_fence_controller(self):
+        controller = self.make_controller()
+        window = PetWindow(controller, self.assets)
+        menu = window._build_context_menu()
+        lock_action = next(
+            action for action in menu.actions() if action.text() == "🧱  锁定位置"
+        )
+        self.assertFalse(lock_action.isChecked())
+        lock_action.trigger()
+        self.assertTrue(controller.fence.is_enabled())
+        window._build_context_menu()
+        window._set_position_locked(False)
+        self.assertFalse(controller.fence.is_enabled())
         window.shutdown()
         window.close()
 

@@ -8,6 +8,9 @@ memory/conversations.json
 memory/memories.db
 memory/memories.db-*
 memory/scheduled_tasks.json
+database/*.db
+database/*.db-wal
+database/*.db-shm
 
 # External Live2D assets (keep assets/live2d/README.md tracked)
 *.moc3

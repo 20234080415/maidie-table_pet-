@@ -4,8 +4,8 @@ import ctypes
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QFont, QPalette
 from PyQt6.QtWidgets import QApplication, QWidget
 
 
@@ -186,24 +186,37 @@ QGroupBox::title {
   font-weight: 600;
 }
 QMenu {
-  background: rgba(238, 245, 255, 246);
-  color: #172033;
-  border: 1px solid rgba(110, 136, 172, 105);
-  border-radius: 12px;
-  padding: 7px;
+  background: rgba(238, 246, 255, 250);
+  color: #273b52;
+  border: 1px solid rgba(132, 172, 213, 125);
+  border-radius: 14px;
+  padding: 8px;
 }
 QMenu::item {
   background: transparent;
-  border-radius: 8px;
-  padding: 7px 28px 7px 12px;
+  border-radius: 9px;
+  padding: 9px 32px 9px 14px;
 }
 QMenu::item:selected {
-  background: rgba(10, 132, 255, 42);
-  color: #075fbd;
+  background: rgba(117, 177, 238, 70);
+  color: #225f9c;
+}
+QMenu::item:disabled {
+  color: #567798;
+  font-weight: 700;
+}
+QMenu::indicator {
+  width: 16px;
+  height: 16px;
+}
+QMenu::indicator:checked {
+  image: url(__UI_ASSETS__/check.svg);
+  background: #78afe6;
+  border-radius: 5px;
 }
 QMenu::separator {
   height: 1px;
-  background: rgba(105, 126, 157, 45);
+  background: rgba(108, 147, 187, 52);
   margin: 5px 9px;
 }
 QScrollBar:vertical {
@@ -327,9 +340,49 @@ def apply_application_theme(app: QApplication) -> None:
     app.setStyleSheet(BASE_STYLE)
 
 
-def apply_dialog_theme(widget: QWidget, *, dark: bool = False) -> None:
+def apply_dialog_theme(
+    widget: QWidget, *, dark: bool = False, backdrop: bool = True
+) -> None:
     widget.setStyleSheet(CONSOLE_STYLE if dark else BASE_STYLE)
-    QTimer.singleShot(0, lambda: _enable_windows_backdrop(widget, dark=dark))
+    if backdrop:
+        QTimer.singleShot(0, lambda: _enable_windows_backdrop(widget, dark=dark))
+
+
+def prepare_translucent_window(widget: QWidget) -> None:
+    """Configure a custom-painted window for a real antialiased alpha surface."""
+
+    widget.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
+    widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+    widget.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+    widget.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+    widget.setAutoFillBackground(False)
+    palette = widget.palette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0, 0))
+    widget.setPalette(palette)
+
+
+def disable_windows_backdrop(widget: QWidget) -> None:
+    """Keep custom alpha edges untouched by DWM backdrops and native borders."""
+
+    if sys.platform != "win32" or not widget.isVisible():
+        return
+    try:
+        hwnd = int(widget.winId())
+        dwm = ctypes.windll.dwmapi
+        backdrop = ctypes.c_int(1)  # DWMSBT_NONE.
+        corner = ctypes.c_int(1)  # DWMWCP_DONOTROUND; Qt paints the smooth edge.
+        border = ctypes.c_uint32(0xFFFFFFFE)  # DWMWA_COLOR_NONE.
+        dwm.DwmSetWindowAttribute(
+            hwnd, 38, ctypes.byref(backdrop), ctypes.sizeof(backdrop)
+        )
+        dwm.DwmSetWindowAttribute(
+            hwnd, 33, ctypes.byref(corner), ctypes.sizeof(corner)
+        )
+        dwm.DwmSetWindowAttribute(
+            hwnd, 34, ctypes.byref(border), ctypes.sizeof(border)
+        )
+    except (AttributeError, OSError, ValueError):
+        return
 
 
 def _enable_windows_backdrop(widget: QWidget, *, dark: bool = False) -> None:
@@ -342,8 +395,18 @@ def _enable_windows_backdrop(widget: QWidget, *, dark: bool = False) -> None:
         backdrop = ctypes.c_int(3)  # DWMSBT_TRANSIENTWINDOW, acrylic-like.
         corner = ctypes.c_int(2)  # DWMWCP_ROUND.
         dark_mode = ctypes.c_int(1 if dark else 0)
-        dwm.DwmSetWindowAttribute(hwnd, 38, ctypes.byref(backdrop), ctypes.sizeof(backdrop))
-        dwm.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(corner), ctypes.sizeof(corner))
-        dwm.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(dark_mode), ctypes.sizeof(dark_mode))
+        border = ctypes.c_uint32(0xFFFFFFFE)  # Remove the dark native outline.
+        dwm.DwmSetWindowAttribute(
+            hwnd, 38, ctypes.byref(backdrop), ctypes.sizeof(backdrop)
+        )
+        dwm.DwmSetWindowAttribute(
+            hwnd, 33, ctypes.byref(corner), ctypes.sizeof(corner)
+        )
+        dwm.DwmSetWindowAttribute(
+            hwnd, 20, ctypes.byref(dark_mode), ctypes.sizeof(dark_mode)
+        )
+        dwm.DwmSetWindowAttribute(
+            hwnd, 34, ctypes.byref(border), ctypes.sizeof(border)
+        )
     except (AttributeError, OSError, ValueError):
         return

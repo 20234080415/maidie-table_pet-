@@ -17,14 +17,18 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from ai.service import InviteActivationService
 from animation.direction_manager import DirectionManager
 from core.behavior import AutonomousBehaviorController, BehaviorKind
+from core.cloud import runtime_service_settings
 from core.experience import AttentionManager, BehaviorOrchestrator, EmotionState
 from core.brain.fast_route import is_simple_time_query, is_weather_query
 from core.fence import FenceController
 from core.movement import Bounds, MovementController, Vec2
+from core.pet_state import PetStateManager
 from core.session import AISessionCoordinator
 from core.state import BehaviorPriority, PetState, StateMachine
+from core.time_manager import TimeManager
 from core.vision.intent_rules import VisionScope, detect_vision_scope
 
 
@@ -49,6 +53,7 @@ class PetController(QObject):
     coding_agent_event = pyqtSignal(object)
     output_event = pyqtSignal(object)
     conversation_history_cleared = pyqtSignal()
+    pet_state_changed = pyqtSignal(object)
 
     def __init__(
         self,
@@ -61,6 +66,8 @@ class PetController(QObject):
         proactive_runtime: Any | None = None,
         proactive_tick_seconds: int = 45,
         autostart_manager: Any | None = None,
+        pet_state_store: Any | None = None,
+        time_manager: TimeManager | None = None,
     ) -> None:
         super().__init__()
         self.ai_router = ai_router
@@ -71,6 +78,9 @@ class PetController(QObject):
         self.action_registry = action_registry
         self.proactive_runtime = proactive_runtime
         self.autostart_manager = autostart_manager
+        self.pet_state_manager = PetStateManager(pet_state_store)
+        self.time_manager = time_manager or self.pet_state_manager.time
+        self.pet_state_manager.time = self.time_manager
         self.state_machine = StateMachine()
         self.movement = MovementController(**(movement_options or {}))
         self.direction = DirectionManager()
@@ -269,6 +279,23 @@ class PetController(QObject):
     def recent_chats(self) -> list[dict[str, str]]:
         return self.memory.get_recent()
 
+    def important_memories(self) -> list[dict[str, Any]]:
+        loader = getattr(self.memory, "load_memories", None)
+        return loader(20) if callable(loader) else []
+
+    def pet_state_snapshot(self) -> dict[str, Any]:
+        emotion = self.emotion_state.get_dominant_emotion()
+        return self.pet_state_manager.snapshot(emotion)
+
+    def time_context_snapshot(self) -> dict[str, Any]:
+        first_meet_time = self.pet_state_manager.state.first_meet_time
+        return self.time_manager.context(first_meet_time).to_dict()
+
+    def _record_pet_interaction(self, interaction: str) -> None:
+        self.time_manager.mark_interaction()
+        self.pet_state_manager.record_interaction(interaction)
+        self.pet_state_changed.emit(self.pet_state_snapshot())
+
     def settings_snapshot(self) -> dict[str, Any]:
         public = self.config_store.public_settings() if self.config_store else {}
         public["startup_supported"] = bool(
@@ -280,6 +307,68 @@ class PetController(QObject):
             except Exception:
                 self.logger.exception("Unable to read Windows autostart state")
         return public
+
+    def _configure_ai_clients(self, config: dict[str, Any]) -> None:
+        ai = config.get("ai", {})
+        technical = config.get("codex", {})
+        environment_key = (
+            os.getenv("DEEPSEEK_API_KEY")
+            if ai.get("provider", "deepseek") == "deepseek"
+            else ""
+        )
+        key = environment_key or ai.get("api_key", "")
+        personality = self.config_store.personality_prompt(config)
+        for client in (self.ai_router.chat_client, self.ai_router.codex_client):
+            if hasattr(client, "configure"):
+                client.configure(config, personality)
+        chat_client = self.ai_router.chat_client
+        technical_client = self.ai_router.codex_client
+        if not hasattr(chat_client, "configure") and hasattr(
+            chat_client, "reconfigure"
+        ):
+            chat_client.reconfigure(
+                key,
+                ai.get("base_url", "https://api.deepseek.com"),
+                ai.get("model", "deepseek-v4-flash"),
+                personality,
+            )
+        if not hasattr(technical_client, "configure") and hasattr(
+            technical_client, "reconfigure"
+        ):
+            technical_client.reconfigure(
+                key,
+                technical.get("base_url")
+                or ai.get("base_url", "https://api.deepseek.com"),
+                technical.get("model", "deepseek-v4-pro"),
+            )
+        synthesizer = getattr(self.ai_router, "synthesizer", None)
+        if synthesizer is not None:
+            synthesizer.personality_prompt = personality
+
+    def _configure_cloud_services(self, config: dict[str, Any]) -> None:
+        for plugin in self._plugins:
+            if hasattr(plugin, "configure"):
+                plugin.configure(runtime_service_settings(config, "network"))
+        screen_tool = self.ai_router.executor.tool_registry.get("screen")
+        vision_service = getattr(screen_tool, "vision_service", None)
+        if vision_service is not None and hasattr(vision_service, "reconfigure"):
+            vision_service.reconfigure(runtime_service_settings(config, "vision"))
+
+    def activate_invite(self, invite_code: str) -> dict[str, Any]:
+        if not self.config_store:
+            return {"success": False, "message": "邀请码无效，请检查后重试"}
+        result = InviteActivationService(self.config_store).activate(invite_code)
+        if not result.get("success"):
+            return result
+        config = result.get("config")
+        if not isinstance(config, dict):
+            config = self.config_store.load()
+        self._configure_ai_clients(config)
+        self._configure_cloud_services(config)
+        public = self.config_store.public_settings()
+        self.settings_changed.emit(public)
+        self._broadcast("on_settings_changed", public)
+        return result
 
     def apply_settings(self, values: dict[str, Any]) -> dict[str, Any]:
         if not self.config_store:
@@ -305,34 +394,8 @@ class PetController(QObject):
         else:
             applied_values["launch_on_startup"] = False
         config = self.config_store.update_user_settings(applied_values)
-        ai = config.get("ai", {})
-        technical = config.get("codex", {})
-        environment_key = (
-            os.getenv("DEEPSEEK_API_KEY") if ai.get("provider", "deepseek") == "deepseek" else ""
-        )
-        key = environment_key or ai.get("api_key", "")
-        personality = self.config_store.personality_prompt(config)
-        chat_client = self.ai_router.chat_client
-        technical_client = self.ai_router.codex_client
-        if hasattr(chat_client, "reconfigure"):
-            chat_client.reconfigure(
-                key,
-                ai.get("base_url", "https://api.deepseek.com"),
-                ai.get("model", "deepseek-v4-flash"),
-                personality,
-            )
-        if hasattr(technical_client, "reconfigure"):
-            technical_client.reconfigure(
-                key,
-                technical.get("base_url") or ai.get("base_url", "https://api.deepseek.com"),
-                technical.get("model", "deepseek-v4-pro"),
-            )
-        synthesizer = getattr(self.ai_router, "synthesizer", None)
-        if synthesizer is not None:
-            synthesizer.personality_prompt = personality
-        for plugin in self._plugins:
-            if hasattr(plugin, "configure"):
-                plugin.configure(config.get("network", {}))
+        self._configure_ai_clients(config)
+        self._configure_cloud_services(config)
         if self.proactive_runtime:
             proactive = config.get("proactive", {})
             engine = self.proactive_runtime.engine
@@ -345,10 +408,6 @@ class PetController(QObject):
                 vision = config.get("vision", {})
                 screen_reader.enabled = bool(vision.get("enabled", False))
                 screen_reader.interval_seconds = max(30.0, float(vision.get("interval_seconds", 60)))
-        screen_tool = self.ai_router.executor.tool_registry.get("screen")
-        vision_service = getattr(screen_tool, "vision_service", None)
-        if vision_service is not None and hasattr(vision_service, "reconfigure"):
-            vision_service.reconfigure(config.get("vision", {}))
         coding_tool = self.ai_router.executor.tool_registry.get("coding_agent")
         if coding_tool is not None and hasattr(coding_tool, "configure"):
             coding_tool.configure(config.get("workspace", {}), config.get("coding_agent", {}))
@@ -551,6 +610,7 @@ class PetController(QObject):
             self.set_state(PetState.IDLE, BehaviorPriority.USER_CLICK, 250, force=True)
 
     def on_pet_clicked(self) -> None:
+        self._record_pet_interaction("click")
         self.movement.stop()
         self._broadcast("on_click")
         self.set_state(PetState.REACTING, BehaviorPriority.USER_CLICK, 520, animation="reacting")
@@ -561,6 +621,7 @@ class PetController(QObject):
 
     def on_headpat(self) -> None:
         """Play a local head-pat reaction without spending an API request."""
+        self._record_pet_interaction("headpat")
         self.movement.stop()
         self._broadcast("on_headpat")
         self.emotion_state.apply_event("headpat")
@@ -568,6 +629,7 @@ class PetController(QObject):
         self._play_action("headpat")
 
     def on_facepoke(self) -> None:
+        self._record_pet_interaction("click")
         self.movement.stop()
         self._broadcast("on_facepoke")
         self.emotion_state.apply_event("facepoke")
@@ -630,6 +692,8 @@ class PetController(QObject):
                 self.local_message_requested.emit("好，你框一下要我看的地方就行。")
                 self.region_selection_requested.emit(message)
             return
+        if not proactive and str(message).strip():
+            self._record_pet_interaction("chat")
         self.ai_session.submit(message, proactive)
 
     def complete_region_selection(self, message: str,
@@ -638,6 +702,8 @@ class PetController(QObject):
         if getattr(self, "_shutting_down", False):
             return
         self._selected_region_rect = rect
+        if str(message).strip():
+            self._record_pet_interaction("chat")
         self.ai_session.submit(message, False)
 
     def cancel_region_selection(self) -> None:
@@ -683,6 +749,11 @@ class PetController(QObject):
         attention_context = self.attention_manager.context_for(message)
         if attention_context:
             context.append(attention_context)
+        context.append(
+            self.time_manager.agent_context(
+                self.pet_state_manager.state.first_meet_time
+            )
+        )
         return context, pending_reaction
 
     def _handle_stream_delta(self, delta: str) -> None:
@@ -996,14 +1067,23 @@ class PetController(QObject):
         if experience_decision:
             self._broadcast("on_behavior_decision", experience_decision)
         if decision:
+            self.time_manager.mark_proactive_activity()
             self.submit_text(decision.prompt, proactive=True)
             self._pending_reaction = decision.action
+        elif time_event := self.time_manager.poll_hourly_event():
+            self._broadcast("on_time_event", time_event)
+            self.submit_text(time_event.agent_prompt, proactive=True)
+            self._pending_reaction = time_event.animation
         elif self.proactive_runtime.engine.enabled and context.get("mouse_state") != "idle":
             changed = self.set_state(PetState.WATCHING, BehaviorPriority.AUTONOMOUS,
                                      900, animation="idle")
             if changed:
                 token = self._state_token
                 QTimer.singleShot(950, lambda: self._recover_if_current(token))
+        elif self.time_manager.should_use_sleepy_animation(
+            float(context.get("idle_time", 0))
+        ):
+            self._play_action("sleepy")
         elif float(context.get("idle_time", 0)) >= 300:
             self._play_action("sleepy")
 

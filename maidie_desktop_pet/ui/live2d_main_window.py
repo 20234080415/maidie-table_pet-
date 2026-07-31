@@ -33,12 +33,21 @@ class Live2DMainWindow(PetWindow):
         self.apply_live2d_state("idle")
 
     def _build_context_menu(self) -> QMenu:
-        menu = QMenu(self)
-        menu.addAction("打开设置", self.show_settings)
-        menu.addAction("切回 Sprite", self.switch_to_sprite)
-        menu.addAction("重置 Live2D 显示参数", self.reset_live2d_display)
-        menu.addSeparator()
-        menu.addAction("关闭 Maidie", self.request_exit)
+        menu = super()._build_context_menu()
+        for action in menu.actions():
+            settings_menu = action.menu()
+            if settings_menu is None or action.text() != "⚙  设置":
+                continue
+            settings_menu.addSeparator()
+            self._add_menu_action(
+                settings_menu, "切回 Sprite", self.switch_to_sprite
+            )
+            self._add_menu_action(
+                settings_menu,
+                "重置 Live2D 显示参数",
+                self.reset_live2d_display,
+            )
+            break
         return menu
 
     def switch_to_sprite(self) -> bool:

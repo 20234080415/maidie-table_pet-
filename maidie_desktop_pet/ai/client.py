@@ -57,6 +57,10 @@ def _unwrap_nested_response(result: dict[str, Any]) -> dict[str, Any]:
 
 
 class AIClient(ABC):
+    def chat(self, message: str) -> AIResponse:
+        """Small public entry point for callers that do not need conversation context."""
+        return self.ask(message, [])
+
     @abstractmethod
     def ask(self, prompt: str, context: list[dict[str, Any]]) -> AIResponse:
         raise NotImplementedError

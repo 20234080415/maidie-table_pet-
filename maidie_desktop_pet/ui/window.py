@@ -18,7 +18,11 @@ from ui.fence_overlay import FenceOverlayWindow
 from ui.resize_handle import SubtleResizeHandle
 from ui.coding_agent_console import CodingAgentConsole
 from ui.long_response_panel import LongResponsePanel
+from ui.diary_widget import DiaryWidget
+from ui.pet_menu import PetContextMenu
+from ui.skin_manager import SkinManager
 from ui.sprite import HatchPetSprite
+from ui.status_widget import StatusWidget
 from core.vision.region_selector import RegionSelector
 
 
@@ -86,6 +90,9 @@ class PetWindow(QWidget):
         self._dialog = None
         self._help_dialog: HelpDialog | None = None
         self._about_dialog: AboutDialog | None = None
+        self._status_widget: StatusWidget | None = None
+        self._diary_widget: DiaryWidget | None = None
+        self._skin_manager: SkinManager | None = None
         self._region_selector: RegionSelector | None = None
         self._selection_message = ""
         self._opacity_before_selection = self.windowOpacity()
@@ -316,33 +323,121 @@ class PetWindow(QWidget):
             menu.exec(global_pos)
 
     def _build_context_menu(self) -> QMenu:
-        menu = QMenu(self)
-        menu.addAction("和 Maidie 聊天", self.open_chat)
-        menu.addAction("设置", self.show_settings)
+        menu = PetContextMenu(parent=self)
+        title_action = menu.addAction("🧸  Maidie")
+        title_action.setEnabled(False)
         menu.addSeparator()
-        menu.addAction("帮助与说明", self.show_help)
-        menu.addAction("关于 Maidie", self.show_about)
-        update_action = menu.addAction("检查更新")
-        update_action.setEnabled(False)
+
+        self._add_menu_action(menu, "💬  聊聊", self.open_chat)
+        self._add_menu_action(menu, "✨  我的 Maidie", self.show_status)
+        self._add_menu_action(menu, "📖  Maidie 日记", self.show_diary)
+        self._add_menu_action(menu, "🎨  更换皮肤", self.show_skin_manager)
+
+        settings_menu = PetContextMenu("⚙  设置", menu)
+        self._add_menu_action(
+            settings_menu,
+            "🎞  动画设置",
+            lambda: self.show_settings_tab("动画 / Live2D"),
+        )
+        self._add_menu_action(settings_menu, "🔊  声音设置", self.show_sound_settings)
+        self._add_menu_action(
+            settings_menu,
+            "🤖  AI 设置",
+            lambda: self.show_settings_tab("模型与 API"),
+        )
+        self._add_menu_action(
+            settings_menu,
+            "🚀  开机启动",
+            lambda: self.show_settings_tab("常规与性格"),
+        )
+        appearance_menu = PetContextMenu("👗  外观设置", settings_menu)
+        self._add_menu_action(
+            appearance_menu,
+            "打开外观设置",
+            lambda: self.show_settings_tab("常规与性格"),
+        )
+        appearance_menu.addSeparator()
+        self._add_menu_action(
+            appearance_menu, "放大 10%", lambda: self.scale_window(1.1)
+        )
+        self._add_menu_action(
+            appearance_menu, "缩小 10%", lambda: self.scale_window(0.9)
+        )
+        self._add_menu_action(
+            appearance_menu, "恢复默认大小", lambda: self.resize(320, 380)
+        )
+        settings_menu.addMenu(appearance_menu)
+        menu.addMenu(settings_menu)
+
         menu.addSeparator()
-        menu.addAction("最近聊天", self.show_recent_chats)
+        locked = self.controller.fence.is_enabled()
+        lock_action = menu.addAction("🧱  锁定位置")
+        lock_action.setCheckable(True)
+        lock_action.setChecked(locked)
+        lock_action.triggered.connect(self._set_position_locked)
         menu.addSeparator()
-        menu.addAction("放大 10%", lambda: self.scale_window(1.1))
-        menu.addAction("缩小 10%", lambda: self.scale_window(0.9))
-        menu.addAction("恢复默认大小", lambda: self.resize(320, 380))
-        menu.addAction("清除聊天记录", self._clear_conversation_history)
-        menu.addSeparator()
-        if self.controller.fence.is_enabled():
-            menu.addAction("解除围栏模式", self.controller.disable_fence)
-        else:
-            menu.addAction("开启围栏模式", self.controller.enable_fence)
-        menu.addSeparator()
-        menu.addAction("退出", self.request_exit)
+        self._add_menu_action(menu, "❓  帮助与说明", self.show_help)
+        self._add_menu_action(menu, "🚪  退出", self.request_exit)
         return menu
+
+    @staticmethod
+    def _add_menu_action(menu: QMenu, text: str, callback):
+        action = menu.addAction(text)
+        action.triggered.connect(lambda _checked=False: callback())
+        return action
+
+    def _set_position_locked(self, locked: bool) -> None:
+        if locked:
+            self.controller.enable_fence()
+        else:
+            self.controller.disable_fence()
 
     def show_recent_chats(self) -> None:
         self._dialog = RecentChatsDialog(self.controller, self)
         self._dialog.exec()
+
+    def show_status(self) -> None:
+        if self._status_widget is None:
+            self._status_widget = StatusWidget(
+                self.controller,
+                self.assets_dir,
+                self,
+                avatar_provider=self._current_pet_pixmap,
+            )
+        self._status_widget.show()
+        self._status_widget.raise_()
+        self._status_widget.activateWindow()
+
+    def _current_pet_pixmap(self):
+        current_view = getattr(self, "live2d_view", None)
+        if current_view is None:
+            pixmap = self.character.pixmap()
+            if pixmap is not None and not pixmap.isNull():
+                return pixmap
+            current_view = self.character
+        return current_view.grab()
+
+    def show_diary(self) -> None:
+        if self._diary_widget is None:
+            self._diary_widget = DiaryWidget(self.controller, self)
+        self._diary_widget.show()
+        self._diary_widget.raise_()
+        self._diary_widget.activateWindow()
+
+    def show_skin_manager(self) -> None:
+        if self._skin_manager is None:
+            self._skin_manager = SkinManager(self.controller, self)
+            self._skin_manager.open_animation_settings_requested.connect(
+                self._open_animation_settings_from_skin
+            )
+        self._skin_manager.show()
+        self._skin_manager.raise_()
+        self._skin_manager.activateWindow()
+
+    def _open_animation_settings_from_skin(self) -> None:
+        if self._skin_manager is not None:
+            self._skin_manager.hide()
+        self.show_settings_tab("动画 / Live2D")
 
     def _clear_conversation_history(self) -> None:
         if not self.controller.clear_conversation_history():
@@ -355,9 +450,15 @@ class PetWindow(QWidget):
         self.long_response_panel.close()
 
     def show_settings(self) -> None:
+        self._show_settings_dialog()
+
+    def show_settings_tab(self, tab_name: str) -> None:
+        self._show_settings_dialog(tab_name)
+
+    def _show_settings_dialog(self, initial_tab: str | None = None) -> None:
         # Keep settings independent from the always-on-top pet window so it can
         # move behind other applications and be minimized normally.
-        self._dialog = SettingsDialog(self.controller)
+        self._dialog = SettingsDialog(self.controller, initial_tab=initial_tab)
         app = QApplication.instance()
         quit_on_last_window = app.quitOnLastWindowClosed() if app else True
         if app:
@@ -370,6 +471,14 @@ class PetWindow(QWidget):
         if accepted:
             self.bubble.show_message("设置已经保存好啦。")
             self._position_overlays()
+
+    def show_sound_settings(self) -> None:
+        QMessageBox.information(
+            self,
+            "声音设置",
+            "Maidie 的独立声音模块还在准备中。以后音量、语音和静音选项"
+            "都会继续放在这里。",
+        )
 
     def show_help(self) -> None:
         if self._help_dialog is None or not self._help_dialog.isVisible():
@@ -637,7 +746,14 @@ class PetWindow(QWidget):
             self._region_selector.close()
             self._region_selector.deleteLater()
             self._region_selector = None
-        for dialog in (self._dialog, self._help_dialog, self._about_dialog):
+        for dialog in (
+            self._dialog,
+            self._help_dialog,
+            self._about_dialog,
+            self._status_widget,
+            self._diary_widget,
+            self._skin_manager,
+        ):
             if dialog is not None:
                 dialog.close()
         if self.fence_overlay is not None:

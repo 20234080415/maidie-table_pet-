@@ -262,6 +262,8 @@ class Synthesizer:
 
     @staticmethod
     def _client_ready(client: Any) -> bool:
+        if hasattr(client, "is_available"):
+            return bool(client.is_available)
         return not hasattr(client, "api_key") or bool(
             client.api_key and client.api_key != "YOUR_API_KEY_HERE"
         )

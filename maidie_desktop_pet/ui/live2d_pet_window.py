@@ -9,7 +9,6 @@ from PyQt6.QtCore import QPoint, Qt, QTimer, QUrl
 from PyQt6.QtGui import QAction, QKeyEvent, QMouseEvent, QResizeEvent, QWheelEvent
 from PyQt6.QtWidgets import (
     QHBoxLayout,
-    QMenu,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -20,6 +19,7 @@ from animation.live2d_backend import Live2DBackend
 from animation.live2d_preview_server import Live2DPreviewServer
 from animation.live2d_web import viewer_root
 from animation.model_manager import AnimationModel
+from ui.pet_menu import PetContextMenu
 
 WEBENGINE_AVAILABLE = find_spec("PyQt6.QtWebEngineWidgets") is not None
 
@@ -277,13 +277,7 @@ class Live2DPetWindow(QWidget):
     def contextMenuEvent(self, event) -> None:
         if event is None:
             return
-        menu = QMenu(self)
-        menu.setStyleSheet(
-            "QMenu { background: #2a2e37; color: #e0e0e0; border: 1px solid #78dfff; "
-            "padding: 4px; } "
-            "QMenu::item { padding: 6px 24px; } "
-            "QMenu::item:selected { background: #3a5060; }"
-        )
+        menu = PetContextMenu(parent=self)
         settings_action = QAction("打开设置", menu)
         settings_action.triggered.connect(self._handle_open_settings)
         menu.addAction(settings_action)

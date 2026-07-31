@@ -1,4 +1,7 @@
 {
+  "ai_mode": "disabled",
+  "user_token": "",
+  "device_id": "",
   "ai": {
     "provider": "deepseek",
     "api_key": "",
@@ -11,6 +14,14 @@
     "base_url": "https://api.deepseek.com",
     "model": "deepseek-v4-pro",
     "timeout": 90
+  },
+  "cloud": {
+    "base_url": "https://yfihoiziesvsimcowmda.supabase.co",
+    "verify_invite_path": "/functions/v1/verify-invite",
+    "chat_path": "/functions/v1/maidie-chat",
+    "search_path": "/functions/v1/maidie-search",
+    "vision_path": "/functions/v1/maidie-vision",
+    "timeout": 30
   },
   "personality": {
     "preset": "wjk_idol",

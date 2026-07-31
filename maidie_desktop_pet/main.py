@@ -38,7 +38,8 @@ def apply_safe_backend_override(config: dict, force_sprite: bool) -> dict:
     overridden["animation"] = dict(config.get("animation", {}), backend="sprite")
     return overridden
 
-from ai.client import OpenAICompatibleClient
+from ai.service import build_ai_clients
+from core.cloud import runtime_service_settings
 from core.brain import BrainRouter, Synthesizer
 from core.pet import PetController
 from core.actions import ActionRegistry
@@ -54,6 +55,7 @@ from core.proactive import ProactiveEngine, ProactiveRuntime
 from core.tasks import TaskScheduler
 from core.vision import ScreenReader, VisionService
 from core.version import APP_NAME, APP_VERSION
+from database import PetStateStore
 from animation.live2d_web import resolve_animation_backend
 from animation.model_manager import AnimationModelRegistry
 from input.manager import InputManager
@@ -107,6 +109,21 @@ def _create_main_window(config: dict, controller: PetController,
     return window, "sprite", status
 
 
+def _run_startup_ai_setup(window: object, controller: PetController) -> None:
+    """Offer authorization only when neither custom API nor invite token exists."""
+    if controller.settings_snapshot().get("ai_mode") != "disabled":
+        return
+    from ui.dialogs import SettingsDialog
+    from ui.invite_dialog import AIServiceSetupDialog, InviteCodeDialog
+
+    chooser = AIServiceSetupDialog(window)
+    chooser.exec()
+    if chooser.choice == "invite":
+        InviteCodeDialog(controller.activate_invite, window).exec()
+    elif chooser.choice == "custom":
+        SettingsDialog(controller, window, initial_tab="模型与 API").exec()
+
+
 def build_application() -> tuple[QApplication, object, PetController, InputManager]:
     logger = setup_logger(ROOT / "logs" / "maidie.log")
     force_sprite = force_sprite_requested()
@@ -124,10 +141,8 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
     if force_sprite:
         config = apply_safe_backend_override(config, True)
         logger.warning("Safe startup requested with --force-sprite; Live2D config ignored.")
-    chat_client, codex_client = OpenAICompatibleClient.clients_from_config(
-        ROOT / "config" / "config.json"
-    )
-    network_plugin = NetworkPlugin(config.get("network", {}))
+    chat_client, codex_client = build_ai_clients(config)
+    network_plugin = NetworkPlugin(runtime_service_settings(config, "network"))
     memory = ConversationMemory(ROOT / "memory" / "memories.db")
     confirmation_broker = ConfirmationBroker()
     system_tool = SystemTool(
@@ -146,7 +161,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         MouseTracker(idle_detector), WindowTracker(), AppTracker(), screen_reader, ClipboardTracker()
     )
     vision_service = VisionService()
-    vision_service.reconfigure(vision_options)
+    vision_service.reconfigure(runtime_service_settings(config, "vision"))
     tool_registry = ToolRegistry([
         TimeTool(), WeatherTool(), SearchTool(network_plugin),
         ScreenTool(awareness, vision_service),
@@ -185,6 +200,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         proactive_runtime=proactive_runtime,
         proactive_tick_seconds=int(proactive_options.get("tick_seconds", 45)),
         autostart_manager=autostart_manager,
+        pet_state_store=PetStateStore(ROOT / "database" / "pet_state.db"),
     )
     controller.cursor_chase = cursor_chase
     controller.register_plugin(network_plugin)
@@ -202,6 +218,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
 def main() -> int:
     app, window, controller, _input_manager = build_application()
     logger = controller.logger
+    _run_startup_ai_setup(window, controller)
     app.aboutToQuit.connect(window.shutdown)
     interrupt_timer = QTimer()
     interrupt_timer.setInterval(200)
