@@ -133,7 +133,7 @@ Router 能区分当前时间与目标时间差，例如：
 
 ### 填写 API Key 后仍无法聊天
 
-检查 Base URL、模型名、网络连接与 `logs/maidie.log`。环境变量可能覆盖 JSON 中的主 AI Key。
+检查 Base URL、模型名、网络连接与 `%APPDATA%\Maidie\logs\maidie.log`。环境变量可能覆盖 JSON 中的主 AI Key。
 
 ### 倒计时被当成屏幕问题
 

@@ -42,9 +42,10 @@ class MemorySystemTests(unittest.TestCase):
         self.assertEqual(loaded[0]["importance"], 0.9)
 
     def test_memory_limit(self):
+        memory = ConversationMemory(self.path, limit=20)
         for index in range(25):
-            self.memory.save(f"message-{index}", f"response-{index}")
-        recent = self.memory.get_recent()
+            memory.save(f"message-{index}", f"response-{index}")
+        recent = memory.get_recent()
         self.assertEqual(len(recent), 20)
         self.assertEqual(recent[0]["message"], "message-5")
         connection = sqlite3.connect(self.path)
@@ -56,12 +57,30 @@ class MemorySystemTests(unittest.TestCase):
             connection.close()
         self.assertEqual(count, 20)
 
-    def test_sensitive_memory_is_rejected(self):
+    def test_default_recent_chat_limit_preserves_more_than_twenty_turns(self):
+        for index in range(25):
+            self.memory.save(f"message-{index}", f"response-{index}")
+
+        recent = self.memory.get_recent()
+
+        self.assertEqual(len(recent), 25)
+        self.assertEqual(recent[0]["message"], "message-0")
+
+    def test_sensitive_long_term_memory_is_rejected_and_chat_is_redacted(self):
         self.assertFalse(
             self.memory.save_memory("fact", "api_key", "sk-secret-value", 1.0)
         )
         self.memory.save("我的密码是 123456", "我不会保存它")
-        self.assertEqual(self.memory.get_recent(), [])
+        recent = self.memory.get_recent()
+        self.assertEqual(len(recent), 1)
+        self.assertNotIn("123456", recent[0]["message"])
+        self.assertIn("[已隐藏敏感信息]", recent[0]["message"])
+
+    def test_security_terms_without_secret_values_do_not_drop_chat(self):
+        self.assertTrue(
+            self.memory.save("token 是什么意思？", "token 是模型处理文本的单位。")
+        )
+        self.assertEqual(len(self.memory.get_recent()), 1)
 
     def _seed_all_memory_types(self):
         self.memory.save("hello", "hi")

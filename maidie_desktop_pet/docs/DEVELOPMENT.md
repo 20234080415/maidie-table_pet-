@@ -186,17 +186,22 @@ Qt UI 测试使用 `QT_QPA_PLATFORM=offscreen`，不需要显示真实窗口。
 
 ## 维护打包配置
 
-- `build_exe.bat` 使用当前激活的 Python/conda 环境，不依赖项目 `.venv`。
+- `scripts/build.py` 是唯一真实构建入口，使用当前激活的 Python/conda 环境。
+- `build_exe.bat` 与 `build_installer.bat` 仅是 beta 兼容转发，不得加入构建逻辑。
 - `maidie.spec` 会递归收集 `assets/` 和 `docs/`，新增普通素材无需逐项登记。
 - 新增运行时数据目录时，应在 `maidie.spec` 的 `datas` 中加入整个目录。
 - 新增通过字符串动态导入的插件包时，应加入 `hiddenimports` 或使用 `collect_submodules`。
 - 新增配置字段时，同时更新 `packaging/config.json`，但绝不能写入真实 Key。
-- 发布前应从干净目录运行 `build_exe.bat`，启动 `dist/Maidie/Maidie.exe` 并检查动画、配置写入、日志和记忆数据库。
-- `build_installer.bat [version]` 使用 `packaging/maidie.iss` 将 one-folder 产物封装为 Inno Setup 安装包。
+- 发布前应运行 `python scripts/build.py beta|stable`，启动 release 目录内的
+  `Maidie.exe`，并安装生成的安装器进行检查。
+- `installer/MaidieSetup.iss` 只维护安装行为；版本、输入目录和输出名称均由
+  `scripts/build.py` 注入。
 - 安装包构建始终先重建 EXE，避免把旧的 `dist/Maidie` 误装进新版本。
 - `packaging/maidie-icon.png` 是透明图标源，`packaging/maidie.ico` 是 EXE、安装器和快捷方式共用的多尺寸图标。
-- 安装目录位于当前用户的 LocalAppData，确保配置、日志和记忆可写，同时避免请求管理员权限。
-- `config/config.json` 使用 `onlyifdoesntexist` 和 `uninsneveruninstall`；修改安装规则时必须继续保护用户配置。
+- 安装目录只存放程序与静态资源；配置、日志和数据库统一写入 `%APPDATA%\Maidie`。
+- 安装器默认以管理员权限安装到 `C:\Program Files\Maidie`，不复用历史安装路径。
+- 安装目录中的 `config/config.json` 仅作为首次启动默认模板，运行时不得写回；安装器不得访问或删除 `%APPDATA%\Maidie`。
+- Inno Setup 只排除已经确认有 release 对应项的 Qt WebEngine debug 资源，未知 DLL、Qt/Python runtime 和 PyInstaller one-folder 结构不得裁剪。
 
 ## 未来扩展方向
 

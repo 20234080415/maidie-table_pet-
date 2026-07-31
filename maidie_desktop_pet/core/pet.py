@@ -675,26 +675,28 @@ class PetController(QObject):
                 animation="waiting",
             )
 
-    def submit_text(self, message: str, proactive: bool = False) -> None:
+    def submit_text(self, message: str, proactive: bool = False) -> bool:
         """把用户或 Proactive 文本提交给唯一 AISessionCoordinator。
 
         UI 线程只处理 busy/框选等即时门控；实际 Router/LLM/Tool 工作由 Session 提交到
         后台 Executor。selected-region 请求先完成显式框选，避免在未获范围时截图。
         """
         if getattr(self, "_shutting_down", False):
-            return
+            return False
         if self.ai_session.busy:
             if not proactive:
                 self.local_message_requested.emit("我还在分析上一个任务，完成后再告诉我吧。")
-            return
+            return False
         if not proactive and detect_vision_scope(message) is VisionScope.SELECTED_REGION:
             if not self.ai_session.busy:
                 self.local_message_requested.emit("好，你框一下要我看的地方就行。")
                 self.region_selection_requested.emit(message)
-            return
-        if not proactive and str(message).strip():
+                return True
+            return False
+        accepted = self.ai_session.submit(message, proactive)
+        if accepted and not proactive and str(message).strip():
             self._record_pet_interaction("chat")
-        self.ai_session.submit(message, proactive)
+        return accepted
 
     def complete_region_selection(self, message: str,
                                   rect: tuple[int, int, int, int]) -> None:
@@ -728,7 +730,7 @@ class PetController(QObject):
         self.set_state(target_state, target_priority, 400, force=True,
                        animation="happy" if proactive else None)
         # Session 历史、Attention 和一次性框选坐标在此汇合，再作为显式 context 进入 Brain。
-        context = self.memory.get_recent()
+        context = self.memory.get_recent()[-20:]
         if self._selected_region_rect is not None:
             context.append({"vision_selected_rect": self._selected_region_rect,
                             "event_type": "internal"})
@@ -822,7 +824,11 @@ class PetController(QObject):
         internal_event = bool(self.ai_session.pending_proactive)
         stored_response = str(response.get("full_text") or response["text"])
         if not internal_event:
-            self.memory.save(message, stored_response)
+            saved = self.memory.save(message, stored_response)
+            if saved is False:
+                self.local_message_requested.emit(
+                    "刚才这轮聊天没能写进日记，我已经留下错误记录供排查。"
+                )
         should_extract = self._should_extract_memory(message, response)
         if (
             should_extract and not internal_event

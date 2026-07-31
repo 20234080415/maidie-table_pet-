@@ -465,8 +465,15 @@ class InviteActivationService:
                 "message": "邀请码服务尚未配置，请稍后重试",
             }
         try:
+            existing_token = str(config.get("user_token") or "").strip()
+            headers = (
+                {"Authorization": f"Bearer {existing_token}"}
+                if existing_token
+                else None
+            )
             response = self._requests.post(
                 endpoint,
+                headers=headers,
                 json={
                     "invite_code": code,
                     "device_id": self.config_store.ensure_device_id(),
@@ -474,16 +481,37 @@ class InviteActivationService:
                 timeout=int(config.get("cloud", {}).get("timeout", 30)),
             )
             payload = response.json()
-            token = str(payload.get("token") or "").strip()
-            if response.ok and payload.get("success") is True and token:
-                saved = self.config_store.save_invite_token(token)
-                return {
-                    "success": True,
-                    "message": "Maidie准备好陪你啦~",
-                    "config": saved,
-                }
         except (requests.RequestException, ValueError, TypeError):
-            pass
+            return {
+                "success": False,
+                "message": "邀请码服务暂时不可用，请稍后重试",
+            }
+
+        token = str(payload.get("token") or "").strip()
+        if (
+            response.ok
+            and payload.get("success") is True
+            and payload.get("already_active") is True
+            and existing_token
+        ):
+            return {
+                "success": True,
+                "message": "邀请码授权已经生效，无需重复激活",
+                "config": config,
+            }
+        if response.ok and payload.get("success") is True and token:
+            try:
+                saved = self.config_store.save_invite_token(token)
+            except (OSError, ValueError, TypeError):
+                return {
+                    "success": False,
+                    "message": "邀请码已验证，但授权保存失败，请重新输入同一邀请码",
+                }
+            return {
+                "success": True,
+                "message": "Maidie准备好陪你啦~",
+                "config": saved,
+            }
         return {"success": False, "message": "邀请码无效，请检查后重试"}
 
 

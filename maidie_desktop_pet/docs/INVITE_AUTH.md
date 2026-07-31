@@ -21,6 +21,8 @@ VisionService
 
 客户端激活时调用 `verify-invite`，提交 `invite_code` 和随机安装标识 `device_id`。成功后只保存返回的原始 `user_token`。数据库 `maidie_users.token` 保存的是 SHA-256 哈希，因此数据库读取权限泄露时也不会直接得到可用 token。
 
+如果云端兑换成功、但客户端在写入配置时中断，同一设备可以再次提交同一个邀请码。服务端会轮换该设备的 token 并返回新的原始 token；其他设备仍不能重复使用该邀请码，被管理员禁用或撤销的授权也不能恢复。
+
 ## Supabase 资源
 
 - `maidie_invite_codes`：邀请码、状态、创建时间、使用时间。

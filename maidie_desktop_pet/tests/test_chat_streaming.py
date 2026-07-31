@@ -135,6 +135,20 @@ class StreamingUiTests(unittest.TestCase):
         self.assertGreater(background.green(), 225)
         bubble.close()
 
+    def test_multiline_reply_expands_without_clipping(self):
+        bubble = SpeechBubble()
+        bubble.begin_stream()
+        text = "\n".join(f"第{index}行回复" for index in range(15))
+        bubble.append_text(text)
+        self._wait_until(
+            lambda: bubble._size_animation.state() == QAbstractAnimation.State.Stopped
+        )
+
+        self.assertFalse(bubble.content_overflows())
+        self.assertEqual(bubble._text_view.verticalScrollBar().maximum(), 0)
+        self.assertLessEqual(bubble.height(), bubble.maximumHeight())
+        bubble.close()
+
     def test_first_visible_fragment_syncs_speaking_animation(self):
         controller = PetController(_Router(), _Memory())
         emotions: list[str] = []

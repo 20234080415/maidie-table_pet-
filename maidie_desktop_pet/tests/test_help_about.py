@@ -11,7 +11,16 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from core.version import (
-    APP_AUTHOR, APP_DESCRIPTION, APP_NAME, APP_TECH_STACK, APP_VERSION,
+    APP_AUTHOR,
+    APP_BUILD,
+    APP_CHANNEL_LABEL,
+    APP_DESCRIPTION,
+    APP_DISPLAY_VERSION,
+    APP_GITHUB_URL,
+    APP_NAME,
+    APP_TECH_STACK,
+    APP_VERSION,
+    APP_VERSION_LABEL,
 )
 from ui.about_dialog import AboutDialog
 from ui.dialogs import SettingsDialog
@@ -42,9 +51,17 @@ class _StartupController(_Controller):
 
 class VersionInformationTests(unittest.TestCase):
     def test_application_identity_is_available(self):
-        self.assertEqual(APP_NAME, "Maidie Desktop Pet")
-        self.assertEqual(APP_VERSION, "v0.1.0-dev")
-        self.assertEqual(APP_AUTHOR, "tyz")
+        self.assertEqual(APP_NAME, "Maidie")
+        self.assertEqual(APP_VERSION, "0.9.0")
+        self.assertEqual(APP_VERSION_LABEL, "v0.9.0")
+        self.assertEqual(APP_CHANNEL_LABEL, "Beta")
+        self.assertEqual(APP_BUILD, 1)
+        self.assertEqual(APP_AUTHOR, "大橘味定")
+        self.assertEqual(APP_DISPLAY_VERSION, "0.demo")
+        self.assertEqual(
+            APP_GITHUB_URL,
+            "https://github.com/20234080415/maidie-table_pet-agent",
+        )
         self.assertTrue(APP_DESCRIPTION)
         self.assertEqual(APP_TECH_STACK, "Python + PyQt6 + LLM Agent + vision_ai")
 
@@ -64,11 +81,24 @@ class HelpAndAboutPageTests(unittest.TestCase):
     def test_about_page_reads_shared_version(self):
         page = AboutPage()
         version = page.findChild(QLabel, "aboutVersion")
+        creator = page.findChild(QLabel, "aboutCreator")
         name = page.findChild(QLabel, "aboutAppName")
         self.assertIsNotNone(version)
+        self.assertIsNotNone(creator)
         self.assertIsNotNone(name)
-        self.assertEqual(version.text(), f"当前版本：{APP_VERSION}")
+        self.assertEqual(version.text(), f"版本 {APP_DISPLAY_VERSION}")
+        self.assertIn(APP_AUTHOR, creator.text())
         self.assertEqual(name.text(), APP_NAME)
+        page.close()
+
+    @patch("ui.settings.about_page.QDesktopServices.openUrl")
+    def test_about_page_opens_configured_github(self, open_url):
+        page = AboutPage()
+
+        page.open_github()
+
+        opened = open_url.call_args.args[0]
+        self.assertEqual(opened.toString(), APP_GITHUB_URL)
         page.close()
 
     def test_help_and_about_are_independent_dialogs(self):

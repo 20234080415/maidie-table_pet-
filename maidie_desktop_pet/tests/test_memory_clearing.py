@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPushButton
 
 from core.brain import BrainRouter
 from core.pet import PetController
@@ -148,14 +148,27 @@ class MemoryClearingUiTests(unittest.TestCase):
         controller = Mock()
         page = MemorySettingsPage(controller)
         with patch("ui.dialogs.QMessageBox.question", return_value=QMessageBox.StandardButton.No):
+            page._clear_conversation_context()
             page._clear_long_term_memory()
             page._clear_all_memory()
+        controller.clear_conversation_history.assert_not_called()
         controller.clear_long_term_memory.assert_not_called()
         controller.clear_all_memory.assert_not_called()
         page.close()
 
-    def test_confirm_calls_correct_long_term_and_all_interfaces(self):
+    def test_memory_page_includes_delete_context_option(self):
+        page = MemorySettingsPage(Mock())
+
+        button_texts = {
+            button.text() for button in page.findChildren(QPushButton)
+        }
+
+        self.assertIn("删除上下文", button_texts)
+        page.close()
+
+    def test_confirm_calls_correct_memory_clear_interfaces(self):
         controller = Mock()
+        controller.clear_conversation_history.return_value = True
         controller.clear_long_term_memory.return_value = True
         controller.clear_all_memory.return_value = True
         page = MemorySettingsPage(controller)
@@ -163,8 +176,10 @@ class MemoryClearingUiTests(unittest.TestCase):
             patch("ui.dialogs.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes),
             patch("ui.dialogs.QMessageBox.information"),
         ):
+            page._clear_conversation_context()
             page._clear_long_term_memory()
             page._clear_all_memory()
+        controller.clear_conversation_history.assert_called_once_with()
         controller.clear_long_term_memory.assert_called_once_with()
         controller.clear_all_memory.assert_called_once_with()
         page.close()

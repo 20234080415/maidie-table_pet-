@@ -150,6 +150,61 @@ class DualAIServiceTests(unittest.TestCase):
         self.assertEqual(self.store.load()["user_token"], "")
         self.assertEqual(self.store.load()["ai_mode"], AI_MODE_DISABLED)
 
+    def test_verified_invite_reports_local_persistence_failure(self):
+        session = _Session(
+            _Response({"success": True, "token": "recoverable-user-token"})
+        )
+        with patch.object(
+            self.store, "save_invite_token", side_effect=OSError("disk busy")
+        ):
+            result = InviteActivationService(
+                self.store, request_session=session
+            ).activate("MAIDIE-RETRY")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(
+            result["message"],
+            "邀请码已验证，但授权保存失败，请重新输入同一邀请码",
+        )
+        self.assertTrue(self.store.load()["device_id"])
+        self.assertEqual(self.store.load()["user_token"], "")
+
+    def test_invite_token_is_saved_even_when_custom_chat_api_has_priority(self):
+        config = self.store.load()
+        config["ai"]["api_key"] = "user-owned-key"
+        self.store._atomic_write(config)
+        session = _Session(
+            _Response({"success": True, "token": "shared-service-token"})
+        )
+
+        result = InviteActivationService(
+            self.store, request_session=session
+        ).activate("MAIDIE-SHARED")
+        saved = self.store.load()
+
+        self.assertTrue(result["success"])
+        self.assertEqual(saved["ai_mode"], AI_MODE_CUSTOM)
+        self.assertEqual(saved["user_token"], "shared-service-token")
+
+    def test_existing_active_token_is_sent_and_kept_without_redeeming_again(self):
+        self.store.save_invite_token("existing-active-token")
+        session = _Session(
+            _Response({"success": True, "already_active": True})
+        )
+
+        result = InviteActivationService(
+            self.store, request_session=session
+        ).activate("ANOTHER-INVITE")
+        saved = self.store.load()
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["message"], "邀请码授权已经生效，无需重复激活")
+        self.assertEqual(saved["user_token"], "existing-active-token")
+        self.assertEqual(
+            session.calls[0][1]["headers"]["Authorization"],
+            "Bearer existing-active-token",
+        )
+
     def test_deleting_token_requires_authorization_again(self):
         self.store.save_invite_token("opaque-user-token")
         self.assertEqual(self.store.load()["ai_mode"], AI_MODE_INVITE)

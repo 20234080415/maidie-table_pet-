@@ -42,7 +42,12 @@ class ChatInput(QLineEdit):
         text = self.text().strip()
         if text:
             self.submitted.emit(text)
-            self.clear()
+        else:
+            self.dismiss()
+
+    def accept_submission(self) -> None:
+        """Clear the editor only after the controller accepted the request."""
+        self.clear()
         self.dismiss()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:

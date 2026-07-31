@@ -80,9 +80,21 @@ class ShutdownTests(unittest.TestCase):
         for label in (
             "🧸  Maidie", "💬  聊聊", "✨  我的 Maidie",
             "📖  Maidie 日记", "🎨  更换皮肤", "⚙  设置",
-            "🧱  锁定位置", "❓  帮助与说明", "🚪  退出",
+            "🧱  锁定位置", "❓  帮助与说明", "ℹ️  关于 Maidie",
+            "🚪  退出",
         ):
             self.assertIn(label, actions)
+        visible_labels = [
+            action.text() for action in menu.actions() if action.text()
+        ]
+        self.assertLess(
+            visible_labels.index("❓  帮助与说明"),
+            visible_labels.index("ℹ️  关于 Maidie"),
+        )
+        self.assertLess(
+            visible_labels.index("ℹ️  关于 Maidie"),
+            visible_labels.index("🚪  退出"),
+        )
         for old_label in ("放大 10%", "缩小 10%", "恢复默认大小", "检查更新"):
             self.assertNotIn(old_label, actions)
 

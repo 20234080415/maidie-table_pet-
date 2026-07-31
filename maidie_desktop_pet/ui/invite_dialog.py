@@ -32,7 +32,7 @@ class _ActivationWorker(QObject):
         except Exception:
             result = {
                 "success": False,
-                "message": "邀请码无效，请检查后重试",
+                "message": "邀请码服务暂时不可用，请稍后重试",
             }
         self.finished.emit(result)
 
@@ -112,12 +112,13 @@ class InviteCodeDialog(QDialog):
 
     def _activation_finished(self, result: object) -> None:
         payload = result if isinstance(result, dict) else {}
+        message = str(payload.get("message") or "").strip()
         if payload.get("success"):
             self.status.setStyleSheet("color: #16803a; font-weight: 600;")
-            self.status.setText("Maidie准备好陪你啦~")
+            self.status.setText(message or "Maidie准备好陪你啦~")
             self.accept()
             return
-        self._show_failure("邀请码无效，请检查后重试")
+        self._show_failure(message or "邀请码无效，请检查后重试")
 
     def _show_failure(self, message: str) -> None:
         self.status.setStyleSheet("color: #c0392b;")

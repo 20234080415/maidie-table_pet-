@@ -71,45 +71,38 @@ C:\Program Files\Tesseract-OCR\tessdata\chi_sim.traineddata
 
 启用 OCR 前，请阅读[隐私与安全边界](PRIVACY_AND_SAFETY.md)，再在设置界面开启屏幕理解。
 
-## 打包 Windows EXE
+## 构建 Windows 发布包
 
-先激活用于构建的 conda 或其他 Python 环境，然后运行：
-
-```powershell
-.\build_exe.bat
-```
-
-脚本会在当前环境安装 `requirements.txt` 和 `requirements-build.txt`，再通过 `maidie.spec` 构建。输出位于：
-
-```text
-dist\Maidie\Maidie.exe
-```
-
-这是 one-folder 发布包。复制或发布时必须保留整个 `dist\Maidie` 目录，不能只拿走 EXE。该结构便于后续增加动作、素材、文档和插件，也比 one-file 模式更容易排查资源问题。
-
-构建包使用 `packaging/config.json`，其中不应出现真实 Key。首次运行后可在发布目录的 `config/config.json` 中配置，也可以使用环境变量。
-
-## 构建安装包
-
-正式发布建议在 one-folder 产物外再封装 Inno Setup 安装包。先安装 [Inno Setup 6](https://jrsoftware.org/isinfo.php)，然后运行：
+先激活用于构建的 conda 或其他 Python 3.10+ x64 环境，并安装
+[Inno Setup 6](https://jrsoftware.org/isinfo.php)，然后使用唯一推荐入口：
 
 ```powershell
-.\build_installer.bat 0.1.0
+python scripts/build.py beta
+python scripts/build.py stable
 ```
 
-版本参数可省略，默认使用 `0.1.0`。脚本每次都会先调用 `build_exe.bat`，确保安装包包含最新代码，然后输出：
+脚本读取根目录 `version.json`，根据参数设置发布渠道，清理旧 `build/` 和
+`dist/`，再使用现有 `maidie.spec` 构建 one-folder 程序并调用
+`installer/MaidieSetup.iss`。以 `v0.9.0 beta` 为例，输出为：
 
 ```text
-dist\installer\Maidie-Setup.exe
+release\Maidie-v0.9.0-beta-win64\
+release\Maidie_Setup_v0.9.0_beta.exe
 ```
 
-安装包按当前用户安装到 `%LOCALAPPDATA%\Programs\Maidie`，无需管理员权限，并创建开始菜单快捷方式。桌面快捷方式由用户在安装界面选择。
+发布时必须保留整个 `Maidie-v版本-channel-win64` 目录，不能只拿走 EXE。
+`build_exe.bat` 和 `build_installer.bat` 仅保留为旧 beta 调用的兼容转发，
+不再包含独立打包逻辑。完整发布规范见[发布流程](release.md)。
 
-升级安装不会覆盖用户已经修改的 `config\config.json`；卸载时也会保留该配置。运行时创建的本地记忆不属于安装包文件，不会被安装升级覆盖。若 Inno Setup 安装在自定义位置，可设置：
+构建包使用 `packaging/config.json`，其中不应出现真实 Key。首次运行后可通过设置界面修改 `%APPDATA%\Maidie\config.json`，也可以使用环境变量。
+
+安装包需要管理员权限，默认安装到 `C:\Program Files\Maidie`，并创建开始菜单快捷方式。桌面快捷方式由用户在安装界面选择。
+
+配置、日志、记忆和宠物状态统一写入 `%APPDATA%\Maidie`，安装器不创建、覆盖或卸载该目录。安装目录中的 `config\config.json` 只是首次启动使用的只读默认模板，不是用户配置。若 Inno Setup 安装在自定义位置，可设置：
 
 ```powershell
 $env:INNO_SETUP_COMPILER = "D:\Tools\Inno Setup 6\ISCC.exe"
-.\build_installer.bat 0.1.0
+python scripts/build.py beta
 ```
 
 安装程序默认创建开始菜单快捷方式，桌面快捷方式由用户在安装界面选择。`packaging/maidie.ico` 同时用于应用 EXE、安装程序和快捷方式；透明图标源文件为 `packaging/maidie-icon.png`。

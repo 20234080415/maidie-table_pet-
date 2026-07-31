@@ -124,7 +124,7 @@ class PetWindow(QWidget):
         self.chat_input = ChatInput(self)
         self.coding_console = CodingAgentConsole(controller.cancel_current_task)
         self.long_response_panel = LongResponsePanel()
-        self.chat_input.submitted.connect(controller.submit_text)
+        self.chat_input.submitted.connect(self._submit_chat_input)
         self.resize_handle = SubtleResizeHandle(self)
         self._handle_visibility_timer = QTimer(self)
         self._handle_visibility_timer.timeout.connect(self._update_resize_handle_visibility)
@@ -276,7 +276,10 @@ class PetWindow(QWidget):
 
     def _show_reply(self, response: dict) -> None:
         self.bubble_controller.complete_stream(response)
-        if self.long_response_panel.should_show(response):
+        if (
+            self.long_response_panel.should_show(response)
+            or self.bubble.content_overflows()
+        ):
             self.long_response_panel.show_result(
                 str(response.get("panel_title") or "详细结果"),
                 response.get("content") if isinstance(response.get("content"), dict) else {},
@@ -297,6 +300,10 @@ class PetWindow(QWidget):
 
     def _append_stream(self, delta: str) -> None:
         self.bubble_controller.append_text(delta)
+
+    def _submit_chat_input(self, text: str) -> None:
+        if self.controller.submit_text(text):
+            self.chat_input.accept_submission()
 
     def open_chat(self) -> None:
         self.controller.on_chat_opened()
@@ -377,6 +384,7 @@ class PetWindow(QWidget):
         lock_action.triggered.connect(self._set_position_locked)
         menu.addSeparator()
         self._add_menu_action(menu, "❓  帮助与说明", self.show_help)
+        self._add_menu_action(menu, "ℹ️  关于 Maidie", self.show_about)
         self._add_menu_action(menu, "🚪  退出", self.request_exit)
         return menu
 

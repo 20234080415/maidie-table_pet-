@@ -148,7 +148,7 @@ Background workers must not directly mutate `QWidget`, `QTimer`, `QPixmap`, pet 
 User config:
 
 ```text
-config/config.json
+%APPDATA%/Maidie/config.json
 ```
 
 Packaged default config:
@@ -158,6 +158,7 @@ packaging/config.json
 ```
 
 When adding config fields, update defaults, packaging config, settings UI if relevant, docs, and tests. Keep schema backward compatible.
+Runtime logs and databases must remain under `%APPDATA%/Maidie`; do not write user data into the source or installation directory.
 
 ---
 

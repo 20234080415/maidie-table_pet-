@@ -19,6 +19,7 @@ from typing import Any, Callable
 from uuid import uuid4
 from xml.etree import ElementTree
 
+from core.paths import FILE_AUDIT_PATH
 from core.tools.file_permissions import (
     FileAuthorization,
     FileOperationPlan,
@@ -34,7 +35,7 @@ class FileAuditLogger:
     }
 
     def __init__(self, path: str | Path | None = None) -> None:
-        self.path = Path(path or (Path.cwd() / "logs" / "file_operations.jsonl"))
+        self.path = Path(path) if path is not None else FILE_AUDIT_PATH
         self._lock = threading.Lock()
 
     def record(self, *, operation: str, result: str, plan: FileOperationPlan | None = None,

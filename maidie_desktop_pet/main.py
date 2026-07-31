@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import signal
 import sys
-from pathlib import Path
 
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer
 from PyQt6.QtWidgets import QApplication
@@ -54,6 +53,16 @@ from core.awareness.context import AwarenessContext
 from core.proactive import ProactiveEngine, ProactiveRuntime
 from core.tasks import TaskScheduler
 from core.vision import ScreenReader, VisionService
+from core.paths import (
+    APP_PATH,
+    CONFIG_PATH,
+    FILE_AUDIT_PATH,
+    MAIDIE_LOG_PATH,
+    MEMORY_PATH,
+    PET_STATE_PATH,
+    SCHEDULED_TASKS_PATH,
+    initialize_user_data,
+)
 from core.version import APP_NAME, APP_VERSION
 from database import PetStateStore
 from animation.live2d_web import resolve_animation_backend
@@ -65,7 +74,8 @@ from ui.theme import apply_application_theme
 from utils.logger import setup_logger
 
 
-ROOT = Path(__file__).resolve().parent
+# 保留 ROOT 名称，避免影响现有资源路径和测试调用方式。
+ROOT = APP_PATH
 
 
 def _create_main_window(config: dict, controller: PetController,
@@ -125,7 +135,8 @@ def _run_startup_ai_setup(window: object, controller: PetController) -> None:
 
 
 def build_application() -> tuple[QApplication, object, PetController, InputManager]:
-    logger = setup_logger(ROOT / "logs" / "maidie.log")
+    initialize_user_data()
+    logger = setup_logger(MAIDIE_LOG_PATH)
     force_sprite = force_sprite_requested()
     if not force_sprite:
         _prepare_webengine()
@@ -135,7 +146,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
     app.setQuitOnLastWindowClosed(True)
     apply_application_theme(app)
 
-    config_store = ConfigStore(ROOT / "config" / "config.json")
+    config_store = ConfigStore(CONFIG_PATH)
     config = config_store.load()
     autostart_manager = WindowsAutostartManager(ROOT)
     if force_sprite:
@@ -143,12 +154,12 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         logger.warning("Safe startup requested with --force-sprite; Live2D config ignored.")
     chat_client, codex_client = build_ai_clients(config)
     network_plugin = NetworkPlugin(runtime_service_settings(config, "network"))
-    memory = ConversationMemory(ROOT / "memory" / "memories.db")
+    memory = ConversationMemory(MEMORY_PATH)
     confirmation_broker = ConfirmationBroker()
     system_tool = SystemTool(
         confirmation_callback=confirmation_broker.request,
         workspace=config.get("workspace", {}),
-        audit_path=ROOT / "logs" / "file_operations.jsonl",
+        audit_path=FILE_AUDIT_PATH,
     )
     proactive_options = config.get("proactive", {})
     vision_options = config.get("vision", {})
@@ -185,7 +196,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         coding_trigger_seconds=float(proactive_options.get("coding_trigger_seconds", 7200)),
         random_chance=float(proactive_options.get("random_chance", 0.05)),
     )
-    scheduler = TaskScheduler(ROOT / "memory" / "scheduled_tasks.json")
+    scheduler = TaskScheduler(SCHEDULED_TASKS_PATH)
     proactive_runtime = ProactiveRuntime(awareness, proactive_engine, scheduler, tool_registry, memory)
 
     movement_options = dict(config.get("movement", {}))
@@ -200,7 +211,7 @@ def build_application() -> tuple[QApplication, object, PetController, InputManag
         proactive_runtime=proactive_runtime,
         proactive_tick_seconds=int(proactive_options.get("tick_seconds", 45)),
         autostart_manager=autostart_manager,
-        pet_state_store=PetStateStore(ROOT / "database" / "pet_state.db"),
+        pet_state_store=PetStateStore(PET_STATE_PATH),
     )
     controller.cursor_chase = cursor_chase
     controller.register_plugin(network_plugin)

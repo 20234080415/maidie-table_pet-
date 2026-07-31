@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -11,9 +12,14 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 
+logger = logging.getLogger(__name__)
+
+
 class ConversationMemory:
     """SQLite-backed recent chat and long-term user memory store."""
 
+    DEFAULT_CHAT_LIMIT = 100
+    MAX_CHAT_LIMIT = 500
     SENSITIVE_PATTERN = re.compile(
         r"api[_ -]?key|password|passwd|密码|口令|secret|token|bearer\s+|"
         r"sk-[a-z0-9_-]+|身份证|银行卡|信用卡|cvv|私钥|private key|"
@@ -21,10 +27,22 @@ class ConversationMemory:
         r"[\w.+-]+@[\w.-]+\.[a-z]{2,}|\b1[3-9]\d{9}\b",
         re.IGNORECASE,
     )
+    CHAT_SENSITIVE_VALUE_PATTERN = re.compile(
+        r"(?:api[_ -]?key|password|passwd|密码|口令|secret|token)"
+        r"\s*(?:是|为|[:=])\s*[^\s,，。;；]{4,}|"
+        r"bearer\s+[a-z0-9._~+/=-]{8,}|"
+        r"sk-[a-z0-9_-]{8,}|"
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+        r"[\w.+-]+@[\w.-]+\.[a-z]{2,}|"
+        r"(?<!\d)1[3-9]\d{9}(?!\d)|"
+        r"(?<!\d)\d{17}[\dXx](?!\d)|"
+        r"(?<!\d)\d{16,19}(?!\d)",
+        re.IGNORECASE,
+    )
 
-    def __init__(self, path: Path, limit: int = 20):
+    def __init__(self, path: Path, limit: int = DEFAULT_CHAT_LIMIT):
         self.path = path
-        self.limit = min(20, max(1, int(limit)))
+        self.limit = min(self.MAX_CHAT_LIMIT, max(1, int(limit)))
         self._lock = RLock()
         self._generation = 0
         self._last_search_query = ""
@@ -82,21 +100,29 @@ class ConversationMemory:
                 ).fetchall()
             result = []
             for row in reversed(rows):
-                payload = json.loads(row["value"])
+                try:
+                    payload = json.loads(row["value"])
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning(
+                        "Skipping malformed recent-chat row created at %s",
+                        row["created_at"],
+                    )
+                    continue
                 result.append({
                     "message": str(payload.get("message", "")),
                     "response": str(payload.get("response", "")),
                     "time": str(row["created_at"]),
                 })
             return result
-        except (sqlite3.Error, json.JSONDecodeError, OSError, TypeError):
+        except (sqlite3.Error, OSError, TypeError):
+            logger.warning("Unable to read recent chats from %s", self.path, exc_info=True)
             return []
 
-    def save(self, message: str, response: str) -> None:
-        if self._is_sensitive(f"{message} {response}"):
-            return
+    def save(self, message: str, response: str) -> bool:
+        safe_message = self._redact_chat_text(message)
+        safe_response = self._redact_chat_text(response)
         payload = json.dumps(
-            {"message": str(message), "response": str(response)}, ensure_ascii=False
+            {"message": safe_message, "response": safe_response}, ensure_ascii=False
         )
         now = datetime.now().isoformat(timespec="seconds")
         try:
@@ -112,8 +138,10 @@ class ConversationMemory:
                         ORDER BY id DESC LIMIT ?
                     )
                 """, (self.limit,))
+            return True
         except (sqlite3.Error, OSError):
-            return
+            logger.warning("Unable to save recent chat to %s", self.path, exc_info=True)
+            return False
 
     def save_memory(
         self, memory_type: str, key: str, value: str, importance: float = 0.7
@@ -269,6 +297,10 @@ class ConversationMemory:
     @classmethod
     def _is_sensitive(cls, text: str) -> bool:
         return bool(cls.SENSITIVE_PATTERN.search(text))
+
+    @classmethod
+    def _redact_chat_text(cls, text: str) -> str:
+        return cls.CHAT_SENSITIVE_VALUE_PATTERN.sub("[已隐藏敏感信息]", str(text))
 
     def can_extract(self, message: str, response: str) -> bool:
         return not self._is_sensitive(f"{message} {response}")

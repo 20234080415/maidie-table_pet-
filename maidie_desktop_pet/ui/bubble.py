@@ -27,7 +27,7 @@ class SpeechBubble(QWidget):
         self._text_view.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setMinimumWidth(120)
         self.setMaximumWidth(260)
-        self.setMaximumHeight(240)
+        self.setMaximumHeight(360)
         self._tail_side = "bottom"
         self._stream_text = ""
         self._placeholder = False
@@ -198,6 +198,12 @@ class SpeechBubble(QWidget):
         # Keep the desktop bubble visually clean; the hidden scrollbar still
         # provides the animated viewport offset used above.
         self._text_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def content_overflows(self) -> bool:
+        """Return whether the rendered document cannot fit inside this bubble."""
+        vertical = self.contentsMargins().top() + self.contentsMargins().bottom() + 8
+        required_height = round(self.document().size().height()) + vertical
+        return required_height > self.maximumHeight()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

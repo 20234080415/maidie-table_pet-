@@ -114,16 +114,26 @@ class MemorySettingsPage(QWidget):
         super().__init__(parent)
         self.controller = controller
         layout = QVBoxLayout(self)
-        note = QLabel("聊天记录与长期记忆可以分别清除。长期记忆包括称呼、事实和偏好。")
+        note = QLabel("对话上下文与长期记忆可以分别删除。长期记忆包括称呼、事实和偏好。")
         note.setWordWrap(True)
+        clear_context = QPushButton("删除上下文")
         clear_long_term = QPushButton("清除长期记忆")
         clear_all = QPushButton("清除全部记忆")
+        clear_context.clicked.connect(self._clear_conversation_context)
         clear_long_term.clicked.connect(self._clear_long_term_memory)
         clear_all.clicked.connect(self._clear_all_memory)
         layout.addWidget(note)
+        layout.addWidget(clear_context)
         layout.addWidget(clear_long_term)
         layout.addWidget(clear_all)
         layout.addStretch()
+
+    def _clear_conversation_context(self) -> bool:
+        return self._confirm_and_clear(
+            "确认删除上下文",
+            "这会删除聊天记录和当前会话的短期上下文，但保留称呼、用户事实、偏好等长期记忆。是否继续？",
+            self.controller.clear_conversation_history,
+        )
 
     def _clear_long_term_memory(self) -> bool:
         return self._confirm_and_clear(
@@ -334,6 +344,12 @@ class SettingsDialog(QDialog):
             mode_names.get(self.settings.get("ai_mode", "disabled"), "未配置")
         )
         self.ai_mode_label.setObjectName("settingHint")
+        self.invite_status_label = QLabel(
+            "已激活（可用于默认 AI、Tavily 搜索和千问视觉）"
+            if self.settings.get("has_user_token")
+            else "未激活"
+        )
+        self.invite_status_label.setObjectName("settingHint")
         invite_button = QPushButton("输入邀请码")
         invite_button.clicked.connect(self._open_invite_dialog)
         self.provider = QComboBox()
@@ -355,6 +371,7 @@ class SettingsDialog(QDialog):
         )
         note.setWordWrap(True)
         layout.addRow("当前 AI 模式", self.ai_mode_label)
+        layout.addRow("邀请码授权", self.invite_status_label)
         layout.addRow("统一邀请码（AI / 搜索 / 视觉）", invite_button)
         layout.addRow("接口类型", self.provider)
         layout.addRow("Base URL", self.base_url)
@@ -377,6 +394,11 @@ class SettingsDialog(QDialog):
                 "invite": "邀请码默认服务",
                 "disabled": "未配置",
             }.get(self.settings.get("ai_mode"), "未配置")
+        )
+        self.invite_status_label.setText(
+            "已激活（可用于默认 AI、Tavily 搜索和千问视觉）"
+            if self.settings.get("has_user_token")
+            else "未激活"
         )
 
     def _build_network_tab(self) -> QWidget:

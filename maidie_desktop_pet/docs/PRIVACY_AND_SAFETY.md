@@ -37,7 +37,7 @@ Maidie 采用“敏感能力默认关闭、按任务提供最少上下文、写�
 
 ## 本地记忆
 
-记忆保存在 `memory/memories.db` SQLite 数据库：
+记忆保存在 `%APPDATA%\Maidie\memory.db` SQLite 数据库：
 
 - 近期聊天最多保留 20 条；长期记忆分为事实和偏好。
 - 密码、API Key、令牌、证件、银行卡、联系方式、地址和健康隐私等会经过规则过滤。
@@ -99,9 +99,9 @@ Maidie 因此不是通用命令执行器，也不会接受 Planner 伪造的 `co
 
 ## API Key
 
-- 设置界面使用密码输入框，但 `config/config.json` 中仍是本地明文。
+- 设置界面使用密码输入框，但 `%APPDATA%\Maidie\config.json` 中仍是本地明文。
 - 推荐使用 `DEEPSEEK_API_KEY`、`DASHSCOPE_API_KEY` 等环境变量。
-- 不要提交 `config/config.json`、`.env`、日志、截图或含真实 Key 的示例。
+- 不要提交或分享 `%APPDATA%\Maidie\config.json`、`.env`、日志、截图或含真实 Key 的示例。
 - 公共设置快照只暴露是否已配置，不返回 Key 正文。
 
 ## 日志和问题报告

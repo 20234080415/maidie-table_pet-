@@ -24,10 +24,7 @@ Deno.serve(async (request: Request) => {
     const body = await request.json() as Record<string, unknown>;
     const inviteCode = String(body.invite_code ?? "").trim();
     const deviceId = String(body.device_id ?? "").trim();
-    if (
-      inviteCode.length < 4 || inviteCode.length > 64 ||
-      deviceId.length < 8 || deviceId.length > 128
-    ) {
+    if (deviceId.length < 8 || deviceId.length > 128) {
       return jsonResponse({ success: false }, 400);
     }
 
@@ -41,6 +38,29 @@ Deno.serve(async (request: Request) => {
     const admin = createClient(supabaseUrl, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const authorization = request.headers.get("authorization") ?? "";
+    const existingToken = authorization.startsWith("Bearer ")
+      ? authorization.slice(7).trim()
+      : "";
+    if (existingToken.length >= 32 && existingToken.length <= 256) {
+      const { data: existingUser, error: existingError } = await admin
+        .from("maidie_users")
+        .select("id")
+        .eq("token", await sha256Hex(existingToken))
+        .eq("device_id", deviceId)
+        .eq("status", "active")
+        .maybeSingle();
+      if (!existingError && existingUser) {
+        return jsonResponse({
+          success: true,
+          already_active: true,
+        });
+      }
+    }
+    if (inviteCode.length < 4 || inviteCode.length > 64) {
+      return jsonResponse({ success: false }, 400);
+    }
+
     const { data, error } = await admin.rpc("redeem_maidie_invite", {
       p_code: inviteCode,
       p_device_id: deviceId,

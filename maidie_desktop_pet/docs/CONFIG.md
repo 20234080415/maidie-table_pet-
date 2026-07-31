@@ -1,8 +1,8 @@
 # 配置说明
 
-Maidie 的用户配置位于 `config/config.json`。优先通过右键菜单中的“设置”修改；程序保存时会原子替换配置文件，并在 Key 输入框留空时保留已有值。
+Maidie 的用户配置位于 `%APPDATA%\Maidie\config.json`。优先通过右键菜单中的“设置”修改；程序保存时会原子替换配置文件，并在 Key 输入框留空时保留已有值。
 
-> `config/config.json` 中的 API Key 是本地明文。推荐使用环境变量，绝不能提交真实配置、截图或分享含 Key 的文件。
+> `%APPDATA%\Maidie\config.json` 中的 API Key 是本地明文。推荐使用环境变量，绝不能提交真实配置、截图或分享含 Key 的文件。
 
 ## 顶层配置分组
 
@@ -250,5 +250,5 @@ python main.py
 
 - 设置页只以密码样式显示 Key，公开设置快照只暴露“是否已配置”。
 - JSON 文件并未加密，环境变量只是减少 Key 落盘，不替代主机安全。
-- 不要提交 `config/config.json`、`.env` 或任何真实凭据。
+- 不要提交或分享 `%APPDATA%\Maidie\config.json`、`.env` 或任何真实凭据。
 - 搜索、AI 与视觉服务分别受对应第三方隐私政策约束，详见[隐私与安全边界](PRIVACY_AND_SAFETY.md)。

@@ -79,6 +79,27 @@ class LongResponsePanelTests(unittest.TestCase):
         window.shutdown()
         window.close()
 
+    def test_rendered_bubble_overflow_opens_scrollable_panel(self):
+        controller = PetController(Mock(), _Memory())
+        assets = Path(__file__).resolve().parents[1] / "assets"
+        window = PetWindow(controller, assets)
+        text = "\n".join(f"第{index}行回复" for index in range(28))
+        window._start_stream({"source": "chat"})
+        window._append_stream(text)
+
+        self.assertTrue(window.bubble.content_overflows())
+        window._show_reply({
+            "text": text,
+            "emotion": "idle",
+            "source": "chat",
+        })
+        self.app.processEvents()
+
+        self.assertTrue(window.long_response_panel.isVisible())
+        self.assertEqual(window.long_response_panel.browser.toPlainText(), text)
+        window.shutdown()
+        window.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,7 +33,7 @@ python main.py
 
 ## 配置说明
 
-用户配置位于 `config/config.json`，推荐通过设置界面修改。仓库只提供不含密钥的 `packaging/config.json` 默认模板。
+用户配置位于 `%APPDATA%\Maidie\config.json`，推荐通过设置界面修改。仓库只提供不含密钥的 `packaging/config.json` 默认模板；旧版安装目录中的配置会在首次启动时迁移，已有用户数据不会被覆盖。
 
 | 分组 | 用途 |
 |---|---|
@@ -140,7 +140,7 @@ User Input
 
 ## 安全说明
 
-Maidie 会接触屏幕、窗口、本地文件和第三方模型服务，因此默认采用最小权限：普通聊天不截图；视觉请求不自动扩大范围；写操作需要确认或直接禁止；Coding Agent 只读；日志与仓库不得包含真实密钥、私人截图、剪贴板正文或 `memory/*.db*`。
+Maidie 会接触屏幕、窗口、本地文件和第三方模型服务，因此默认采用最小权限：普通聊天不截图；视觉请求不自动扩大范围；写操作需要确认或直接禁止；Coding Agent 只读；日志与仓库不得包含真实密钥、私人截图、剪贴板正文或用户目录中的数据库。
 
 详见 [PRIVACY_AND_SAFETY.md](docs/PRIVACY_AND_SAFETY.md)。
 
